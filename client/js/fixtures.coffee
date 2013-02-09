@@ -1,7 +1,7 @@
 suggestions1 = [
   { block: 'once', votes: 3 }
   { block: 'there', votes: 1 }
-  { block: 'was', votes: 1 }
+  { block: 'was', votes: 0 }
   { block: 'went', votes: 2 }
 ]
 
@@ -12,4 +12,4 @@ suggestions1 = [
   @ui.suggestions suggestions1
 
 @s1()
-@UI.sortSuggestions()
+@ui.sortSuggestions()
