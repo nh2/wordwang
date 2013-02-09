@@ -1,0 +1,25 @@
+Name:           wordwang
+Version:        0.5
+Cabal-Version:  >= 1.8
+License:        GPL-3
+License-File:   LICENSE
+Stability:      experimental
+Author:         Team Oryx Raptor
+Maintainer:     mail@nh2.com
+Homepage:       https://github.com/nh2/wordwang
+Category:       Web
+Synopsis:       I like turtles
+Build-Type:     Simple
+Description:
+        See the @README.md@ file and the homepage for details.
+
+Extra-Source-Files:     Makefile
+
+Source-repository head
+  Type:                 git
+  Location:             https://github.com/nh2/wordwang
+
+Executable wordwang
+  Build-depends:        base >= 4 && < 5, aeson
+  Ghc-options:          -Wall
+  Main-is:              wordwang.hs
