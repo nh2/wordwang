@@ -19,7 +19,7 @@
           log.innerHTML += "Socket open!<br>";
           log.innerHTML += "Sending data...<br>";
           sock.send("{\"cmd\": \"join\", \"args\": {\"joinGroupId\": null, \"joinUserName\": \"francesco\"}}");
-          sock.send("{\"cmd\": \"send\", \"args\": \"hello\"}");
+          sock.send("{\"cmd\": \"send\", \"args\": {\"blockType\": \"string\", \"blockContent\": \"hello\"}}");
           sock.send("{\"cmd\": \"upvote\", \"args\": 0}");
       };
       sock.onmessage = function(event) {

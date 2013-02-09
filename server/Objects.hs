@@ -132,7 +132,7 @@ instance ToJSON Group
 
 -- | Messages sent by the client to the server.
 --
---   @{"cmd": "send", "args": "hello"}@
+--   @{"cmd": "send", "args": {"blockType": "string", "blockContent": "hello"}}@
 --   @{"cmd": "upvote", "args": 3}@
 --   @{ "cmd": "join"
 --    , "args": {"joinGroupId": null, "joinUserName": "francesco"}
