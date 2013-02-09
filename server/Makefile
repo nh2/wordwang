@@ -1,9 +1,8 @@
-all: build
+all: build test
 
-.PHONY: all build dist install clean doc p ghci
+.PHONY: all build dist install clean doc p test ghci
 
 build: dist/setup-config
-	rm -rf _site _cache
 	cabal-dev build
 
 dist:
@@ -24,8 +23,12 @@ dist/setup-config: wordwang.cabal
 doc: build
 	cabal-dev haddock
 
+test: build
+	cabal-dev test
+
 p:
 	permamake.sh *.hs \
+	             Test/*.hs \
 	             *.cabal \
 	             Makefile
 
