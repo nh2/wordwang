@@ -23,6 +23,7 @@ Executable wordwang
   Build-depends:        base >= 4 && < 5,
                         aeson,
                         websockets,
-                        text
+                        text,
+                        mtl
   Ghc-options:          -Wall
   Main-is:              wordwang.hs
