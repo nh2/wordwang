@@ -4,6 +4,10 @@
   unless bool
     throw n
 
+
+WS_URL = "ws://localhost:8888/"
+
+
 class @UI
   constructor: ->
 
@@ -15,19 +19,33 @@ class @UI
     new window.suggestion(@suggestion()).add()
     @suggestion ''
 
-  isLastParagraph: (index) =>
-    console.log index
-    console.log @story().length - 1
-    console.log index == @story().length - 1
-    index == @story().length - 1
+  refresh: (args) ->
+    log args
 
-connectServer = ->
+
+connectServer = (ui) ->
+  ws = new WebSocket(WS_URL, "protocolOne")
+
+  window.debug_ping = ->
+    ws.send 'ping'
+
+  dispatcher =
+    'refresh': ui.refresh
+
+  ws.onmessage = (data) ->
+    msg = JSON.parse(data.data)
+    dispatch = dispatcher[msg.cmd]
+    if dispatch?
+      dispatch(msg.args)
+    else
+      throw new Error('dispatcher error: ' + msg.cmd)
+
 
 main = ->
-  window.ui = new UI()
+  window.ui = ui = new UI()
   ko.applyBindings(ui)
 
-  #connectServer()
+  connectServer ui
 
 $ ->
   # Unfortunately not all browsers have window.location.origin
