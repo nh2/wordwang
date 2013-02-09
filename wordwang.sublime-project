@@ -4,5 +4,10 @@
 		{
 			"path": "."
 		}
-	]
+	],
+	"settings":
+	{
+		"translateTabsToSpaces": true,
+		"tab_size": 2
+	}
 }

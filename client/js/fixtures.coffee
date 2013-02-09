@@ -38,11 +38,14 @@ Yee, c'mon, that's right. Check."]
 
 window.fixture1 = ->
   do ->
-    new @suggestion('once', 1).add()
-    new @suggestion('there', 3).add()
-    new @suggestion('was', 2).add()
-    new @suggestion('a', 7).add()
-    new @suggestion('an', 5).add()
-    new @suggestion('old', 10).add()
-    new @suggestion('man', 6).add()
+    @ui.addSuggestion('once there was', 1)
+    @ui.addSuggestion('there lived an', 3)
+    @ui.addSuggestion('was', 2)
+    @ui.addSuggestion('an evil witch', 7)
+    @ui.addSuggestion('an apple', 5)
+    @ui.addSuggestion('old woman', 10)
+    @ui.addSuggestion('man, you', 6)
+    @ui.addSuggestion('thanks to', 12)
+    @ui.addSuggestion('he shouted', 8)
+    @ui.addSuggestion('cloudy apple juice', 4)
   window.ui.story story1

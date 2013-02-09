@@ -14,7 +14,7 @@
     <script type='text/javascript' src='js/lib/underscore.js'></script>
 
     <script type="text/coffeescript" src="main.coffee"></script>
-    <script type="text/coffeescript" src="js/suggestions.coffee"></script>
+    <script type="text/coffeescript" src="js/suggestion.coffee"></script>
     <script type="text/coffeescript" src="js/fixtures.coffee"></script>
 
     <script type="text/javascript" src="http://localhost:8001/vogue-client.js"></script>
@@ -30,19 +30,19 @@
         <!-- ko foreach: story -->
         <div>
           <span data-bind="text: $data"></span>
-          <div data-bind="if: $index() === $root.story().length - 1" id="next">
-            <ul class="suggestions" data-bind="foreach: $root.suggestions">
-              <li class="suggestion">
-                <span class="block" data-bind="text: $data.block"></span>
-                <span class="votes" data-bind="text: $data.votes"></span>
-              </li>
-            </ul>
-          </div>
         </div>
         <!-- /ko -->
       </div>
 
       <div class="story_input">
+        <div id="next">
+          <ul class="suggestions" data-bind="foreach: $root.suggestions">
+            <li class="suggestion" data-bind="style: { fontSize: $data.calcFontSize() }">
+              <span class="block" data-bind="text: $data.block"></span>
+              <span class="votes" data-bind="text: $data.votes"></span>
+            </li>
+          </ul>
+        </div>
         <div id="enter">
           <form data-bind="submit: suggest">
             <input type="text" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />

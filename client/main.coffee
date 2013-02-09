@@ -4,6 +4,10 @@
   unless bool
     throw n
 
+
+WS_URL = "ws://localhost:8888/"
+
+
 class @UI
   constructor: ->
 
@@ -11,23 +15,65 @@ class @UI
     @suggestion = ko.observable ''
     @suggestions = ko.observableArray []
 
-  suggest: (args...) ->
-    new window.suggestion(@suggestion()).add()
+  suggest: (args...) =>
+    @addSuggestion(@suggestion())
     @suggestion ''
 
-  isLastParagraph: (index) =>
-    console.log index
-    console.log @story().length - 1
-    console.log index == @story().length - 1
-    index == @story().length - 1
+  refresh: (args) =>
+    log args
+    window.args = args
 
-connectServer = ->
+    # Assemble story
+    for entry in args.groupStory
+      @story.push entry.content
+
+    for entry in args.groupCloud
+      log "entry", entry
+      votes = entry.cloudUids.length
+      s = new suggestion(entry.cloudBlock, votes)
+      s.add()
+
+  ## Suggestions Manipulation
+  addSuggestion: (block, votes = 0) =>
+    s = new window.Suggestion(block, votes)
+    @suggestions.push(s)
+    @sortSuggestions()
+
+  sortSuggestions: =>
+    @suggestions.sort (a,b) -> b.votes() - a.votes()
+
+  setSuggestionVotes: (sug, newv) ->
+    sug.votes newv
+    @sortSuggestions()
+
+  maxSuggestionVotes: ->
+    sug = _.max @suggestions(), (sug) -> sug.votes()
+    sug.votes()
+
+
+connectServer = (ui) ->
+  ws = new WebSocket(WS_URL, "protocolOne")
+
+  window.debug_ping = ->
+    ws.send 'ping'
+
+  dispatcher =
+    'refresh': ui.refresh
+
+  ws.onmessage = (data) ->
+    msg = JSON.parse(data.data)
+    dispatch = dispatcher[msg.cmd]
+    if dispatch?
+      dispatch(msg.args)
+    else
+      throw new Error('dispatcher error: ' + msg.cmd)
+
 
 main = ->
-  window.ui = new UI()
+  window.ui = ui = new UI()
   ko.applyBindings(ui)
 
-  #connectServer()
+  connectServer ui
 
 $ ->
   # Unfortunately not all browsers have window.location.origin
