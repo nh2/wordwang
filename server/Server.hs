@@ -1,7 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, DeriveDataTypeable #-}
 module Server where
 
 import           Control.Concurrent (forkIO, threadDelay)
+import qualified Control.Exception as CE
+import           Data.Data (Data, Typeable)
+import           Control.Exception ( Exception )
 import           Control.Monad (forever, forM_, void)
 import           Control.Monad.Trans (MonadIO(..))
 import           Data.List (maximumBy)
@@ -185,7 +188,15 @@ broadcastCmd cmd GroupState{groupSinks = sinks} =
   where
     sendSink' sink = WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
 
-serve :: String -> Int -> IO ()
+data Shutdown = Shutdown
+              deriving ( Data, Show, Typeable )
+
+instance Exception Shutdown
+
+serve :: String -> Int -> IO (IO ())
 serve host port =
-    do serverState <- newTVarIO (ServerState Map.empty 0)
-       runServer host port (preJoin serverState)
+    do tid <- forkIO $
+           CE.handle (\(_ :: Shutdown) -> return ()) $ do
+               serverState <- newTVarIO (ServerState Map.empty 0)
+               runServer host port (preJoin serverState)
+       return (CE.throwTo tid Shutdown)

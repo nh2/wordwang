@@ -30,7 +30,8 @@ Executable wordwang
                         ghc-prim,
                         stm,
                         time,
-                        ansi-terminal
+                        ansi-terminal,
+                        unix
 
   Ghc-options:          -Wall
   Main-is:              wordwang.hs
@@ -49,7 +50,8 @@ Test-suite gold
                         ghc-prim,
                         stm,
                         time,
-                        ansi-terminal
+                        ansi-terminal,
+                        unix
   Ghc-Options:          -Wall
 
   Build-Depends:        bytestring,
