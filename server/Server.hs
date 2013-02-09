@@ -131,7 +131,8 @@ createGroup serverStateVar gid = liftIO $
               writeTVar serverStateVar
                         (serverState { serverGroups = Map.insert gid groupChan gs })
        spawnFlushCloud _TICK_DELAY groupChan
-       _ <- forkIO (runGroup group
+       _ <- forkIO (runGroup serverStateVar
+                             group
                              (GroupState {groupSinks = Map.empty, groupCount = 0})
                              groupChan)
        return groupChan
@@ -140,8 +141,9 @@ spawnFlushCloud :: (MonadIO m, Functor m) => Int -> GroupChan -> m ()
 spawnFlushCloud secs gchan = void . liftIO . forkIO $
     do threadDelay (secs * 1000000); atomically $ writeTChan gchan Timeout
 
-runGroup :: Group -> GroupState -> GroupChan -> IO ()
-runGroup group@Group{ groupUsers = gusers
+runGroup :: TVar ServerState -> Group -> GroupState -> GroupChan -> IO ()
+runGroup serverStateVar
+         group@Group{ groupUsers = gusers
                     , groupCloud = cloud@(Cloud votes _)
                     , groupStory = story }
          gs@GroupState{ groupSinks = sinks
@@ -156,7 +158,7 @@ runGroup group@Group{ groupUsers = gusers
                               group' = group { groupUsers = Map.insert uid
                                                             (User uid uname) gusers }
                           broadcastCmd (Refresh group') gs'
-                          runGroup group' gs' gchan
+                          runGroup serverStateVar group' gs' gchan
                    (Nothing, Send blockContent) ->
                        do let bid = count
                               gs' = gs {groupCount = count + 1}
@@ -164,24 +166,33 @@ runGroup group@Group{ groupUsers = gusers
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
                           broadcastCmd (Refresh group') gs'
-                          runGroup group' gs' gchan
+                          runGroup serverStateVar group' gs' gchan
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
                            Just cloud' ->
                                do let group' = group {groupCloud = cloud'}
                                   broadcastCmd (Refresh group') gs
-                                  runGroup group' gs gchan
+                                  runGroup serverStateVar group' gs gchan
                            Nothing -> undefined
-                   _ -> do liftIO (print (uid, cmd)); runGroup group gs gchan
+                   _ -> do liftIO (print (uid, cmd))
+                           runGroup serverStateVar group gs gchan
            Timeout ->
                case maxBlock (map snd (Map.toList votes)) of
                    Nothing -> do spawnFlushCloud _TICK_DELAY gchan
-                                 runGroup group gs gchan
+                                 runGroup serverStateVar group gs gchan
+                   Just Block {content = CloseBlock} ->
+                       do atomically $
+                              do serverState@ServerState {finishedStories = fss} <-
+                                     readTVar serverStateVar
+                                 writeTVar serverStateVar serverState {finishedStories = story : fss}
+                          forever $ do liftIO $ putStrLn "Dropping message"
+                                       _ <- atomically $ readTChan gchan
+                                       broadcastCmd (Refresh group) gs
                    Just b -> do let group' = group { groupStory = b : story
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
                                 broadcastCmd (Refresh group') gs
-                                runGroup group' gs gchan
+                                runGroup serverStateVar group' gs gchan
     where
       maxBlock [] = Nothing
       maxBlock xs = Just (cloudBlock (maximumBy (comparing (Set.size . cloudUids)) xs))
