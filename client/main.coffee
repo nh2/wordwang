@@ -34,11 +34,15 @@ class @UI
       if blockType == 'string'
         @story.push blockContent
       else
-        log "ingoring story entry of unknown content:", entry
+        log "WARNING: Ingoring story entry of unknown content:", entry
 
-    for entry in refresh_info.groupCloud
+    for id, entry of refresh_info.groupCloud
       votes = entry.cloudUids.length
-      @addSuggestion(entry.cloudBlock, votes, entry.cloudId)
+      { blockId, content } = entry.cloudBlock
+      if content.blockType == 'string'
+        @addSuggestion(content.blockContent, votes, blockId)
+      else
+        log "WARNING: Unhandled cloud content type:", content
 
   # Sends suggestion to the server
   suggest: (block) =>
@@ -55,6 +59,7 @@ class @UI
   # Directly add suggestion to the UI
   addSuggestion: (block, votes=0, blockId=-1) =>
     s = new window.Suggestion(block, votes, blockId)
+    log "displaying suggestion", s
     @suggestions.push s
     @sortSuggestions()
 
