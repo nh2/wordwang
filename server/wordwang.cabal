@@ -24,6 +24,9 @@ Executable wordwang
                         aeson,
                         websockets,
                         text,
-                        mtl
+                        mtl,
+                        stm,
+                        time,
+                        ansi-terminal
   Ghc-options:          -Wall
   Main-is:              wordwang.hs
