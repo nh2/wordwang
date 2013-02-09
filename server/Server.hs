@@ -8,8 +8,10 @@ import qualified Data.Text.IO as Text
 
 import           Network.WebSockets
 
-echo :: TextProtocol p => WebSockets p ()
-echo = forever $
-    do msg <- receiveData
-       liftIO (Text.putStrLn msg)
-       sendTextData (msg :: Text)
+echo :: TextProtocol p => Request -> WebSockets p ()
+echo rq = do acceptRequest rq; go
+  where
+    go = forever $
+       do msg <- receiveData
+          liftIO (Text.putStrLn msg)
+          sendTextData (msg :: Text)
