@@ -18,7 +18,7 @@
       sock.onopen = function () {
           log.innerHTML += "Socket open!<br>";
           log.innerHTML += "Sending data...<br>";
-          sock.send("This is a message.");
+          sock.send("{\"cmd\": \"join\", \"args\": {\"joinGroupId\": null, \"joinUserName\": \"francesco\"}}");
       };
       sock.onmessage = function(event) {
           log.innerHTML += "Received data: " + event.data + "<br>";
