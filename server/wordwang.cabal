@@ -27,6 +27,10 @@ Executable wordwang
                         mtl,
                         containers,
                         unordered-containers,
-                        ghc-prim
+                        ghc-prim,
+                        stm,
+                        time,
+                        ansi-terminal
+
   Ghc-options:          -Wall
   Main-is:              wordwang.hs
