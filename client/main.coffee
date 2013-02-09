@@ -87,7 +87,6 @@ class @UI
     orig = $ '#next ul.suggestions:not(.suggestionsShown)'
     cont = $ 'div.story_input'
     nxt = $ '#next'
-    log nxt
 
     # Move hidden ul which uses knockout
     oh = orig.outerHeight true
