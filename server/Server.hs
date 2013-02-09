@@ -137,12 +137,11 @@ spawnFlushCloud secs gchan
 runGroup :: Group -> GroupState -> GroupChan -> IO ()
 runGroup group@Group{groupUsers = gusers, groupCloud = Cloud gcloud, groupStory = story}
          gs@GroupState{groupSinks = sinks, groupCount = count} gchan = do
-           
     gcmd <- atomically $ readTChan gchan
     case gcmd of
-      ClientCmdFwd uid mSink cmd -> 
+      ClientCmdFwd uid mSink cmd ->
           case (mSink, cmd) of
-            (Just sink, Join (JoinPayload uname _)) -> 
+            (Just sink, Join (JoinPayload uname _)) ->
                 do let gs' = gs {groupSinks = Map.insert uid sink sinks}
                        group' = group {groupUsers = Map.insert uid (User uid uname) gusers}
                    broadcastCmd (Refresh group') gs'
@@ -170,9 +169,11 @@ runGroup group@Group{groupUsers = gusers, groupCloud = Cloud gcloud, groupStory 
                      spawnFlushCloud _TICK_DELAY gchan
                      runGroup group gs gchan
                    Just (b, _) ->
-                       let group' = group { groupStory = b : story
-                                          , groupCloud = Cloud Map.empty }
-                       in  runGroup group' gs gchan
+                       do let group' = group { groupStory = b : story
+                                             , groupCloud = Cloud Map.empty }
+                          spawnFlushCloud _TICK_DELAY gchan
+                          broadcastCmd (Refresh group') gs
+                          runGroup group' gs gchan
     where
       minBlock :: [(Block, Set.Set UserId)] -> Maybe (Block, Int)
       minBlock [] = Nothing
@@ -180,7 +181,6 @@ runGroup group@Group{groupUsers = gusers, groupCloud = Cloud gcloud, groupStory 
       minBlock ((b, s) : as) = do let n = Set.size s
                                   (b2, m) <- minBlock as
                                   return $ if n < m then (b2, m) else (b, n)
-        
 
 broadcastCmd :: ServerCmd -> GroupState -> IO ()
 broadcastCmd cmd GroupState{groupSinks = sinks} =

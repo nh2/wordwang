@@ -29,17 +29,17 @@
           log.innerHTML += "Socket close!<br>";
       };
 
-      sock1 = new WebSocket("ws://localhost:8888");
-      console.log("Created socket");
-      log = document.getElementById("log");
-      sock1.onopen = function () {
-          log.innerHTML += "Socket open!<br>";
-          log.innerHTML += "Sending data...<br>";
-          sock1.send("{\"cmd\": \"join\", \"args\": {\"joinGroupId\": 2, \"joinUserName\": \"francesco\"}}");
-          sock1.send("{\"cmd\": \"upvote\", \"args\": 0}");
-      };
-      sock1.onmessage = sock.onmessage;
-      sock1.onclose = sock.onclose;
+      // sock1 = new WebSocket("ws://localhost:8888");
+      // console.log("Created socket");
+      // log = document.getElementById("log");
+      // sock1.onopen = function () {
+      //     log.innerHTML += "Socket open!<br>";
+      //     log.innerHTML += "Sending data...<br>";
+      //     sock1.send("{\"cmd\": \"join\", \"args\": {\"joinGroupId\": 2, \"joinUserName\": \"francesco\"}}");
+      //     sock1.send("{\"cmd\": \"upvote\", \"args\": 0}");
+      // };
+      // sock1.onmessage = sock.onmessage;
+      // sock1.onclose = sock.onclose;
     </script>
   </body>
 </html>
