@@ -195,13 +195,6 @@ data ServerCmd = Refresh Group  -- ^ After any event change, the server sends
 instance ToJSON ServerCmd where
     toJSON (Refresh group) = cmdJSON "refresh" group
 
--- instance FromJSON ServerCmd where
---     parseJSON js =
---         do (name, args)  <- jsonCmd js
---            case name of
---                "refresh" -> Refresh <$> parseJSON args
---                _         -> mzero
-
 -- Utils
 
 toJSON2 :: (ToJSON a, ToJSON b) => Text -> a -> Text -> b -> Value
