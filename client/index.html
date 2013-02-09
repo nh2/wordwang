@@ -28,19 +28,18 @@
         <!-- ko foreach: story -->
         <p>
           <span data-bind="text: $data"></span>
-          <span id="end-marker">end</span>
+          <ul class="suggestions" data-bind="foreach: $root.suggestions">
+            <li class="suggestion">
+              <span class="block" data-bind="text: $data.block"></span>
+              <span class="votes" data-bind="text: $data.votes"></span>
+            </li>
+          </ul>
         </p>
         <!-- /ko -->
       </div>
 
       <div class="story_input">
         <div id="next">
-          <ul class="suggestions" data-bind="foreach: suggestions">
-            <li class="suggestion">
-              <span class="block" data-bind="text: $data.block"></span>
-              <span class="votes" data-bind="text: $data.votes"></span>
-            </li>
-          </ul>
         </div>
 
         <div id="enter">
