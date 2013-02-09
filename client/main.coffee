@@ -33,6 +33,22 @@ class @UI
       s = new suggestion(entry.cloudBlock, votes)
       s.add()
 
+  ## Suggestions Manipulation
+  addSuggestion: (block, votes = 0) =>
+    s = new window.Suggestion(block, votes)
+    @suggestions.push(s)
+    @sortSuggestions()
+
+  sortSuggestions: =>
+    @suggestions.sort (a,b) -> b.votes() - a.votes()
+
+  setSuggestionVotes: (sug, newv) ->
+    sug.votes newv
+    @sortSuggestions()
+
+  maxSuggestionVotes: ->
+    sug = _.max @suggestions(), (sug) -> sug.votes()
+    sug.votes()
 
 
 connectServer = (ui) ->
