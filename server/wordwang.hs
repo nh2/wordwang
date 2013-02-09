@@ -1,7 +1,5 @@
 module Main where
 
-import           Network.WebSockets (runServer, WebSockets, Hybi00, Request)
-
 import           Server
 
 main :: IO ()
