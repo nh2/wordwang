@@ -193,6 +193,8 @@ data Shutdown = Shutdown
 
 instance Exception Shutdown
 
+-- | Start the WordWang server on the given host and port, return immediately, and return
+-- an action that shuts down the server.
 serve :: String -> Int -> IO (IO ())
 serve host port =
     do tid <- forkIO $
