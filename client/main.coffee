@@ -16,7 +16,7 @@ class @UI
     @suggestions = ko.observableArray []
 
   suggest: (args...) =>
-    new window.suggestion(@suggestion()).add()
+    @addSuggestion(@suggestion())
     @suggestion ''
 
   refresh: (args) =>
