@@ -20,6 +20,9 @@ Source-repository head
   Location:             https://github.com/nh2/wordwang
 
 Executable wordwang
-  Build-depends:        base >= 4 && < 5, aeson
+  Build-depends:        base >= 4 && < 5,
+                        aeson,
+                        websockets,
+                        text
   Ghc-options:          -Wall
   Main-is:              wordwang.hs
