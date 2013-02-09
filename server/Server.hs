@@ -10,7 +10,8 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import           Network.WebSockets (Request, WebSockets, runServer, Hybi00, Sink, getSink)
+import           Network.WebSockets
+                 (Request, WebSockets, runServer, Hybi00, Sink, getSink)
 import qualified Network.WebSockets as WS
 import qualified Data.Aeson as Aeson
 
@@ -104,7 +105,8 @@ createGroup serverStateVar gid = liftIO $ do
     groupChan <- newTChanIO
     atomically $ do
         serverState@ServerState {serverGroups = gs} <- readTVar serverStateVar
-        writeTVar serverStateVar (serverState { serverGroups = Map.insert gid groupChan gs })
+        writeTVar serverStateVar
+                  (serverState { serverGroups = Map.insert gid groupChan gs })
     _ <- forkIO (runGroup groupState groupChan)
     return groupChan
 
