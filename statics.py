@@ -28,6 +28,8 @@ STATICS = {
     # 'client/js/lib/g.line.js': 'https://raw.github.com/DmitryBaranovskiy/g.raphael/master/g.line.js',
     # 'client/js/lib/date.format.1.2.3.min.js': 'http://www.exratione.com/assets/date.format.1.2.3.min.js',
 
+    'client/fonts/lib/baskerville.woff': 'http://themes.googleusercontent.com/static/fonts/librebaskerville/v1/pR0sBQVcY0JZc_ciXjFsK2vhaIAz1NJzluD_h2UBN7c.woff',
+    'client/fonts/lib/baskerville-italic.woff': 'http://themes.googleusercontent.com/static/fonts/librebaskerville/v1/QHIOz1iKF3bIEzRdDFaf5dCpxY7g_VZuMtgz78Sasn8.woff',
 
     # Runtogether to run multiple daemons in parallel
     'runtogether.py': 'https://raw.github.com/nh2/runtogether/master/runtogether.py',

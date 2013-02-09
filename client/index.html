@@ -34,11 +34,9 @@
       <div data-bind="if: joined">
         <div id="story-container">
           <div class="read-more"></div>
-          <!-- ko foreach: story -->
-          <div>
+          <div data-bind="foreach: story">
             <span data-bind="text: $data"></span>
           </div>
-          <!-- /ko -->
         </div>
 
         <div class="story_input">

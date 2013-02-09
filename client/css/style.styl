@@ -11,6 +11,22 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
   background-image -o-linear-gradient(startPoint, startColor startInterval, endColor endInterval)
   background-image linear-gradient(startPoint, startColor startInterval, endColor endInterval)
 
+@font-face
+  font-family: 'Libre Baskerville'
+  font-style: normal
+  font-weight: 400
+  src: local('Libre Baskerville'), local('LibreBaskerville-Regular'), url('fonts/lib/baskerville.woff') format('woff')
+
+@font-face
+  font-family: 'Libre Baskerville'
+  font-style: italic
+  font-weight: 400
+  src: local('Libre Baskerville Italic'), local('LibreBaskerville-Italic'), url('fonts/lib/baskerville-italic.woff') format('woff')
+
+#story-container
+  font-family: 'Libre Baskerville'
+  font-size: 14pt
+
 #middle
   margin: 0 auto
   width: 45%
@@ -22,6 +38,9 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
 
 #story-container
   position: relative
+
+  div:nth-child(4):after
+    content: '<div class="spacer"></div>'
 
 .read-more
   position: absolute
@@ -51,3 +70,7 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
         border: 1px solid #333
         border-radius: .3em
         padding: .1em .2em
+
+      span.block
+        font-family: 'Libre Baskerville'
+        font-style: italic2
