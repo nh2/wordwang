@@ -1,10 +1,3 @@
-suggestions1 = [
-  { block: 'once', votes: 3 }
-  { block: 'there', votes: 1 }
-  { block: 'was', votes: 0 }
-  { block: 'went', votes: 2 }
-]
-
 story1 = ["2003, I pray for God they people make the right decision
 I don't wanna war. I just wanna peace. Stop the war. Check this.
 I hope my black brothers feel the same like me
@@ -44,5 +37,12 @@ My family, my friends. Nobody wants war. Life is short
 Yee, c'mon, that's right. Check."]
 
 window.fixture1 = ->
-  window.ui.suggestions suggestions1
+  do ->
+    new @suggestion('once', 1).add()
+    new @suggestion('there', 3).add()
+    new @suggestion('was', 2).add()
+    new @suggestion('a', 7).add()
+    new @suggestion('an', 5).add()
+    new @suggestion('old', 10).add()
+    new @suggestion('man', 6).add()
   window.ui.story story1
