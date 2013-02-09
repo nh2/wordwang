@@ -3,7 +3,6 @@ import Server
 import           Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import qualified Control.Exception as CE
 import           System.Posix.Signals ( Handler(..), installHandler, sigINT )
-import           Text.Printf (printf)
 
 main :: IO ()
 main =
@@ -11,7 +10,7 @@ main =
        done <- newEmptyMVar
        _ <- installHandler sigINT (Catch $ putMVar done ()) Nothing
        takeMVar done `CE.finally` (
-           do _ <- printf "Shutting down... "
+           do _ <- putStrLn "Shutting down... "
               shutdown
-              _ <- printf "done\n"
+              _ <- putStrLn "done"
               return ())

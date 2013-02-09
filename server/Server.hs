@@ -7,7 +7,7 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Data (Data, Typeable)
 import           Data.Digest.Pure.SHA (sha1, showDigest)
 import           Control.Exception ( Exception )
-import           Control.Monad (forever, forM, forM_, void, unless)
+import           Control.Monad (forever, forM, forM_, void, unless, filterM)
 import           Control.Monad.Trans (MonadIO(..))
 import           Data.List (maximumBy)
 import           Data.Ord (comparing)
@@ -22,7 +22,8 @@ import qualified Data.Aeson as Aeson
 import           Network.WebSockets
                  (Request, WebSockets, runServer, Hybi00, Sink, getSink)
 import qualified Network.WebSockets as WS
-import           System.Directory (createDirectory, doesDirectoryExist, getDirectoryContents)
+import           System.Directory ( createDirectory, doesDirectoryExist
+                                  , getDirectoryContents, doesFileExist )
 import           System.FilePath ( (</>) )
 
 import           Objects
@@ -181,7 +182,8 @@ runGroup serverStateVar
                    Nothing -> do spawnFlushCloud _TICK_DELAY gchan
                                  runGroup serverStateVar group gs gchan
                    Just Block {content = CloseBlock} ->
-                       do atomically $
+                       do putStrLn "Closed story"
+                          atomically $
                               do serverState@ServerState {finishedStories = fss} <-
                                      readTVar serverStateVar
                                  writeTVar serverStateVar serverState {finishedStories = story : fss}
@@ -207,7 +209,8 @@ broadcastCmd cmd GroupState{groupSinks = sinks} =
 -- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
 saveStories :: (MonadIO m) => [Story] -> m ()
 saveStories ss = liftIO $
-    do dirExists <- doesDirectoryExist _STORY_DIR
+    do _ <- printf "Saving %d stories\n" (length ss)
+       dirExists <- doesDirectoryExist _STORY_DIR
        unless dirExists $ createDirectory _STORY_DIR
        forM_ ss $ \story ->
            do let storyText = BL.pack (show story)
@@ -217,10 +220,12 @@ saveStories ss = liftIO $
 -- list.
 loadStories :: (MonadIO m) => m [Story]
 loadStories = liftIO $
-    do dirExists <- doesDirectoryExist _STORY_DIR
+    do putStrLn "Loading stories"
+       dirExists <- doesDirectoryExist _STORY_DIR
        if dirExists
            then do fs <- getDirectoryContents _STORY_DIR
-                   forM fs $ \f ->
+                   fs' <- filterM doesFileExist fs
+                   forM fs' $ \f ->
                        do text <- BL.readFile f
                           return (read (BL.unpack text))
            else return []
@@ -234,11 +239,14 @@ instance Exception Shutdown
 --   and return an action that shuts down the server.
 serve :: String -> Int -> IO (IO ())
 serve host port =
-    do stories <- loadStories
+    do initialStories <- loadStories
+       serverState <- newTVarIO (ServerState { serverGroups    = Map.empty
+                                             , serverCounter   = 0
+                                             , finishedStories = initialStories })
        tid <- forkIO $
-           CE.handle (\(_ :: Shutdown) -> return ()) $ do
-               serverState <- newTVarIO (ServerState { serverGroups    = Map.empty
-                                                     , serverCounter   = 0
-                                                     , finishedStories = stories })
-               runServer host port (preJoin serverState)
-       return (CE.throwTo tid Shutdown)
+           CE.handle (\(_ :: Shutdown) -> return ())
+               (runServer host port (preJoin serverState))
+       return (do CE.throwTo tid Shutdown
+                  ServerState{finishedStories = stories} <-
+                              atomically $ readTVar serverState
+                  saveStories stories)
