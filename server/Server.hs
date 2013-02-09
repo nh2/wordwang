@@ -40,25 +40,25 @@ data GroupCmd
     = ClientCmdFwd UserId (Maybe (Sink WebSocketProtocol)) ClientCmd
     | Timeout
 
-dummyGroup :: Group
-dummyGroup = Group { groupId    = 2
-                   , groupUsers = users
-                   , groupStory = story
-                   , groupCloud = cloud
-                   }
-  where
-    francesco = User 7 "francesco"
-    andras = User 8 "andras"
-    alex = User 12 "alex"
-    users = Map.fromList $ map (\u -> (userId u, u)) [francesco, andras, alex]
-    block1 = Block 1 "I am potato"
-    block2 = Block 2 ", you are dragon"
-    block3 = Block 3 ", obama SUCKS!"
-    block4 = Block 4 ", n-word n-word n-word"
-    story = [block1, block2]
-    cloud = Cloud (Map.fromList [ (3, CloudItem block3 (Set.fromList [7]))
-                                , (4, CloudItem block4 (Set.fromList [8, 12]))
-                                ])
+-- dummyGroup :: Group
+-- dummyGroup = Group { groupId    = 2
+--                    , groupUsers = users
+--                    , groupStory = story
+--                    , groupCloud = cloud
+--                    }
+--   where
+--     francesco = User 7 "francesco"
+--     andras = User 8 "andras"
+--     alex = User 12 "alex"
+--     users = Map.fromList $ map (\u -> (userId u, u)) [francesco, andras, alex]
+--     block1 = Block 1 "I am potato"
+--     block2 = Block 2 ", you are dragon"
+--     block3 = Block 3 ", obama SUCKS!"
+--     block4 = Block 4 ", n-word n-word n-word"
+--     story = [block1, block2]
+--     cloud = Cloud (Map.fromList [ (3, CloudItem block3 (Set.fromList [7]))
+--                                 , (4, CloudItem block4 (Set.fromList [8, 12]))
+--                                 ])
 
 receiveClientCmd :: WebSockets WebSocketProtocol ClientCmd
 receiveClientCmd =
@@ -114,7 +114,7 @@ createGroup serverStateVar gid = liftIO $
     do let group = Group { groupId = gid
                          , groupUsers = Map.empty
                          , groupStory = []
-                         , groupCloud = Cloud Map.empty
+                         , groupCloud = newCloud
                          }
        groupChan <- newTChanIO
        atomically $
@@ -133,7 +133,7 @@ spawnFlushCloud secs gchan = void . liftIO . forkIO $
 
 runGroup :: Group -> GroupState -> GroupChan -> IO ()
 runGroup group@Group{ groupUsers = gusers
-                    , groupCloud = Cloud gcloud
+                    , groupCloud = cloud@(Cloud votes _)
                     , groupStory = story }
          gs@GroupState{ groupSinks = sinks
                       , groupCount = count }
@@ -151,35 +151,31 @@ runGroup group@Group{ groupUsers = gusers
                    (Nothing, Send blockContent) ->
                        do let bid = count
                               gs' = gs {groupCount = count + 1}
-                              gcloud' = Map.insert bid
-                                        (Block bid blockContent, Set.fromList [uid])
-                                        gcloud
-                              group' = group {groupCloud = Cloud gcloud'}
+                              block = Block bid blockContent
+                              cloud' = insertBlock block uid cloud
+                              group' = group {groupCloud = cloud'}
                           broadcastCmd (Refresh group') gs'
                           runGroup group' gs' gchan
                    (Nothing, Upvote bid) ->
-                       do let mgvotes = Map.lookup bid gcloud
-                          case mgvotes of
-                              Nothing -> undefined
-                              Just (b, uids) ->
-                                  do let gcloud' = Map.insert bid
-                                                   (b, Set.insert uid uids) gcloud
-                                         group' = group {groupCloud = Cloud gcloud'}
-                                     broadcastCmd (Refresh group') gs
-                                     runGroup group' gs gchan
+                       case upvoteBlock bid uid cloud of
+                           Just cloud' ->
+                               do let group' = group {groupCloud = cloud'}
+                                  broadcastCmd (Refresh group') gs
+                                  runGroup group' gs gchan
+                           Nothing -> undefined
                    _ -> do liftIO (print (uid, cmd)); runGroup group gs gchan
            Timeout ->
-               case maxBlock (map snd (Map.toList gcloud)) of
+               case maxBlock (map snd (Map.toList votes)) of
                    Nothing -> do spawnFlushCloud _TICK_DELAY gchan
                                  runGroup group gs gchan
                    Just b -> do let group' = group { groupStory = b : story
-                                                   , groupCloud = Cloud Map.empty }
+                                                   , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
                                 broadcastCmd (Refresh group') gs
                                 runGroup group' gs gchan
     where
       maxBlock [] = Nothing
-      maxBlock xs = Just (fst (maximumBy (comparing (Set.size . snd)) xs))
+      maxBlock xs = Just (cloudBlock (maximumBy (comparing (Set.size . cloudUids)) xs))
 
 broadcastCmd :: ServerCmd -> GroupState -> IO ()
 broadcastCmd cmd GroupState{groupSinks = sinks} =
@@ -193,8 +189,8 @@ data Shutdown = Shutdown
 
 instance Exception Shutdown
 
--- | Start the WordWang server on the given host and port, return immediately, and return
--- an action that shuts down the server.
+-- | Start the WordWang server on the given host and port, return immediately,
+--   and return an action that shuts down the server.
 serve :: String -> Int -> IO (IO ())
 serve host port =
     do tid <- forkIO $

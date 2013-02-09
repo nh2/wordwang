@@ -31,7 +31,8 @@ Executable wordwang
                         stm,
                         time,
                         ansi-terminal,
-                        unix
+                        unix,
+                        hashable
 
   Ghc-options:          -Wall
   Main-is:              wordwang.hs

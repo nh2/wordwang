@@ -3,19 +3,25 @@
 {-# LANGUAGE TupleSections #-}
 module Objects where
 
-import           Control.Applicative ((<$>))
+import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad (mzero)
+import           Data.Maybe (fromJust)
 import           Data.String (IsString(..))
 import           GHC.Generics (Generic)
 
 import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Text (Text)
 
 import           Data.Aeson (FromJSON(..), ToJSON(..), Value)
-import           Data.Aeson.Types (Parser)
 import qualified Data.Aeson as Aeson
+import           Data.Aeson.Types (Parser)
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashSet as HashSet
+import           Data.HashSet (HashSet)
+import           Data.Hashable (Hashable)
 
 import           Common ()
 
@@ -26,19 +32,35 @@ type Id = Int
 
 -- | Blocks are the units that make up a story.
 --
---   @{"blockId": 3, "content": "hello"}@
+--   @{"blockId": 3, {"blockType": "string", "content": "hello"}}@
+--   @{"blockId": 3, {"blockType": "close"}}@
 data Block = Block
     { blockId :: BlockId
     , content :: BlockContent
     } deriving (Eq, Show, Generic)
 type BlockId = Id
-data BlockContent = StringBlock Text
+data BlockContent
+    = StringBlock Text
+    | CloseBlock
     deriving (Eq, Show, Generic)
 
-instance FromJSON Block
+instance Hashable BlockContent
+instance Hashable Block
+
+instance FromJSON Block where
 instance ToJSON Block
-instance FromJSON BlockContent
-instance ToJSON BlockContent
+
+instance ToJSON BlockContent where
+    toJSON (StringBlock s) = toJSON2 "blockType" ("string" :: Text) "blockContent" s
+    toJSON CloseBlock      = Aeson.object [("blockType", Aeson.String "close")]
+
+instance FromJSON BlockContent where
+    parseJSON (Aeson.Object js) =
+        case (HashMap.lookup "blockType" js, HashMap.lookup "blockContent" js) of
+            (Just "string", Just s) -> StringBlock <$> parseJSON s
+            (Just "close", Nothing) -> return CloseBlock
+            _                       -> mzero
+    parseJSON _ = mzero
 
 instance IsString BlockContent where
     fromString = StringBlock . fromString
@@ -47,7 +69,9 @@ instance IsString BlockContent where
 --   @'Set' ['UserId']@ stores the upvotes.
 --
 --   @{"3": [{"blockId": 3, "content": "hello"}, [5]]}@
-newtype Cloud = Cloud (Map BlockId CloudItem)
+
+data Cloud = Cloud (Map BlockId CloudItem)
+                   (HashSet Block)
     deriving (Eq, Show, Generic)
 
 data CloudItem
@@ -58,6 +82,25 @@ data CloudItem
 
 instance FromJSON CloudItem
 instance ToJSON CloudItem
+
+newCloud :: Cloud
+newCloud = Cloud Map.empty HashSet.empty
+
+insertBlock :: Block -> UserId -> Cloud -> Cloud
+insertBlock b@(Block bid _) uid cloud@(Cloud votes hs) =
+    if HashSet.member b hs
+    then fromJust (upvoteBlock bid uid cloud)
+    else case Map.lookup bid votes of
+             Nothing -> Cloud (Map.insert bid (CloudItem b $ Set.fromList [uid]) votes)
+                              (HashSet.insert b hs)
+             Just _ -> error "insertBlock: the impossible happened!"
+
+upvoteBlock :: BlockId -> UserId -> Cloud -> Maybe Cloud
+upvoteBlock bid uid (Cloud votes hs) =
+    case Map.lookup bid votes of
+        Nothing -> Nothing
+        Just (CloudItem b voters) ->
+            Just (Cloud (Map.insert bid (CloudItem b $ Set.insert uid voters) votes) hs)
 
 instance FromJSON Cloud
 instance ToJSON Cloud
@@ -99,7 +142,7 @@ instance ToJSON Group
 
 -- | Messages sent by the client to the server.
 --
---   @{"cmd": "send", "args": "hello"}@
+--   @{"cmd": "send", "args": {"blockType": "string", "blockContent": "hello"}}@
 --   @{"cmd": "upvote", "args": 3}@
 --   @{ "cmd": "join"
 --    , "args": {"joinGroupId": null, "joinUserName": "francesco"}
@@ -119,17 +162,6 @@ data JoinPayload = JoinPayload
 
 instance FromJSON JoinPayload
 instance ToJSON JoinPayload
-
-cmdJSON :: ToJSON a => Text -> a -> Value
-cmdJSON name args =
-    Aeson.object [("cmd", Aeson.String name), ("args", toJSON args)]
-
-jsonCmd :: Value -> Parser (Text, Value)
-jsonCmd (Aeson.Object hm) =
-    case (HashMap.lookup "cmd" hm, HashMap.lookup "args" hm) of
-        (Just (Aeson.String name), Just args) -> (name,) <$> parseJSON args
-        _ -> mzero
-jsonCmd _ = mzero
 
 instance ToJSON ClientCmd where
     toJSON (Send bc)    = cmdJSON "send" bc
@@ -166,7 +198,25 @@ instance ToJSON ServerCmd where
 
 instance FromJSON ServerCmd where
     parseJSON js =
-        do (name, args) <- jsonCmd js
+        do (name, args)  <- jsonCmd js
            case name of
                "refresh" -> Refresh <$> parseJSON args
                _         -> mzero
+
+-- Utils
+
+toJSON2 :: (ToJSON a, ToJSON b) => Text -> a -> Text -> b -> Value
+toJSON2 ix1 v1 ix2 v2 = Aeson.object [(ix1, toJSON v1), (ix2, toJSON v2)]
+
+fromJSON2 :: (FromJSON a, FromJSON b) => Text -> Text -> Value -> Parser (a, b)
+fromJSON2 ix1 ix2 (Aeson.Object hm) =
+    case (HashMap.lookup ix1 hm, HashMap.lookup ix2 hm) of
+        (Just v1, Just v2) -> (,) <$> parseJSON v1 <*> parseJSON v2
+        _ -> mzero
+fromJSON2 _ _ _ = mzero
+
+cmdJSON :: ToJSON a => Text -> a -> Value
+cmdJSON name args = toJSON2 "cmd" name "args" args
+
+jsonCmd :: Value -> Parser (Text, Value)
+jsonCmd = fromJSON2 "cmd" "args"
