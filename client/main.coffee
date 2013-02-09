@@ -5,7 +5,22 @@
     throw n
 
 
+class @UI
+  constructor: ->
+
+    @story = ko.observable ''
+    @suggestion = ko.observable ''
+    @suggestions = ko.observableArray []
+
+  suggest: (args...) ->
+    s = @suggestion()
+    log "suggest", s
+    @suggestions.push(s)
+    @suggestion ''
+
 main = ->
+  window.ui = new UI()
+  ko.applyBindings(ui)
 
 
 $ ->

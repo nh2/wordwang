@@ -21,22 +21,20 @@
 
     <div id="middle">
 
-      <div id="story">
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam ullamcorper lectus at risus consectetur in blandit lorem dignissim. Cras faucibus nibh a risus vehicula ultricies. Nullam non lectus non purus pulvinar rhoncus in ut orci. Integer ut turpis et sapien posuere faucibus. Mauris diam mi, semper quis faucibus eget, tincidunt vel leo. Suspendisse potenti. Pellentesque vitae turpis in est sagittis imperdiet sit amet vel arcu.
-
-        Curabitur pulvinar lacus ut arcu scelerisque volutpat. Donec vel ante vitae turpis varius sodales ultrices vitae lacus. Praesent euismod pulvinar molestie. Nulla facilisi. Ut non lacus ut urna tincidunt semper et quis tortor. Mauris quam tortor, congue ac pulvinar at, pellentesque at purus. Nam malesuada rhoncus risus, non ornare est elementum sit amet.
-      </div>
+      <div id="story" data-bind="text: story"></div>
 
       <div class="story_input">
         <div id="next">
-          <ul>
-            <li>NEXT CHOICES</li>
+          <ul data-bind="foreach: suggestions">
+            <li data-bind="text: $data">
+              NEXT CHOICES
+            </li>
           </ul>
         </div>
 
         <div id="enter">
-          <form>
-            <input type="text" class="enter_text" placeholder="Suggest how the story continues ..." />
+          <form data-bind="submit: suggest">
+            <input type="text" class="enter_text" placeholder="Suggest how the story continues ..." data-bind="value: suggestion, hasfocus: true" />
           </form>
         </div>
       </div>
