@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Server where
 
-import           Control.Monad (forever)
+import           Control.Monad (forever, forM_)
 
 import           Control.Monad.Trans (MonadIO(..))
 -- import qualified Data.Text.IO as Text
@@ -26,10 +26,11 @@ data ServerState = ServerState { serverGroups  :: Map GroupId GroupChan
                                , serverCounter :: Int }
 
 type GroupChan = TChan GroupCmd
+type GroupState = Map UserId (Sink WebSocketProtocol)
 
 type WebSocketProtocol = Hybi00
 
-data GroupCmd = ClientMsgFwd UserId (Maybe (Sink WebSocketProtocol)) ClientCmd
+data GroupCmd = ClientCmdFwd UserId (Maybe (Sink WebSocketProtocol)) ClientCmd
 
 dummyGroup :: Group
 dummyGroup = Group { groupId    = 2
@@ -51,28 +52,34 @@ dummyGroup = Group { groupId    = 2
                                 , (4, (block4, Set.fromList [8, 12]))
                                 ])
 
-preJoin :: TVar ServerState -> Request -> WebSockets WebSocketProtocol ()
-preJoin serverStateVar rq = WS.acceptRequest rq >> go
-  where
-    go = forever $
-       do msg <- WS.receiveData
-          case Aeson.decode' msg :: Maybe ClientCmd of
-              Just cmd@(Join (JoinPayload _ mGroupId)) -> do
-                  liftIO $ print cmd
-                  uid <- makeId serverStateVar
-                  gchan <- getCreateGroup serverStateVar mGroupId
-                  sink <- getSink
-                  liftIO $ atomically $
-                           writeTChan gchan (ClientMsgFwd uid (Just sink) cmd)
-                  runUser serverStateVar uid
-              _ -> do
-                  liftIO $ putStrLn "Failed parse of join"
-                  return ()
+receiveClientCmd :: WebSockets WebSocketProtocol ClientCmd
+receiveClientCmd =
+    do msg <- WS.receiveData
+       maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' msg)
 
-runUser :: TVar ServerState -> UserId -> WebSockets WebSocketProtocol ()
-runUser _serverStateVar uid = do
-    _ <- liftIO $ printf "Running user %s\n" (show uid)
-    return ()
+preJoin :: TVar ServerState -> Request -> WebSockets WebSocketProtocol ()
+preJoin serverStateVar rq =
+    do WS.acceptRequest rq
+       cmd <- receiveClientCmd
+       case cmd of
+           Join (JoinPayload _ mGroupId) -> do
+               liftIO $ print cmd
+               uid <- makeId serverStateVar
+               gchan <- getCreateGroup serverStateVar mGroupId
+               sink <- getSink
+               liftIO $ atomically $
+                        writeTChan gchan (ClientCmdFwd uid (Just sink) cmd)
+               runUser gchan uid
+           _ -> fail "Expecting join message"
+
+runUser :: GroupChan -> UserId -> WebSockets WebSocketProtocol ()
+runUser gchan uid = forever $ do
+    _ <- liftIO $ printf "Waiting for msg for user %s\n" (show uid)
+    cmd <- receiveClientCmd
+    case cmd of
+        Join _ -> fail "Expecting non-join cmd"
+        _ -> liftIO $ atomically $ writeTChan gchan (ClientCmdFwd uid Nothing cmd)
+
           -- liftIO (Text.putStrLn msg)
           -- WS.sendTextData (Aeson.encode (Aeson.toJSON (Refresh dummyGroup)))
 
@@ -108,11 +115,27 @@ createGroup serverStateVar gid = liftIO $ do
         serverState@ServerState {serverGroups = gs} <- readTVar serverStateVar
         writeTVar serverStateVar
                   (serverState { serverGroups = Map.insert gid groupChan gs })
-    _ <- forkIO (runGroup groupState groupChan)
+    _ <- forkIO (runGroup groupState Map.empty groupChan)
     return groupChan
 
-runGroup :: Group -> GroupChan -> IO ()
-runGroup _ _ = return ()
+runGroup :: Group -> GroupState -> GroupChan -> IO ()
+runGroup group@Group{groupUsers = gusers} gs gchan = do
+    ClientCmdFwd uid mSink cmd <- atomically $ readTChan gchan
+    case (mSink, cmd) of
+        (Just sink, Join (JoinPayload uname _)) ->
+            do let gs' = Map.insert uid sink gs
+                   group' = group {groupUsers = Map.insert uid (User uid uname) gusers}
+               broadcastCmd (Refresh group') gs'
+               runGroup group' gs' gchan
+        (Nothing, Send blockContent) -> undefined
+        (Nothing, Upvote bid) -> undefined
+        _ -> fail "Malformed ClientCmdFwd"
+
+broadcastCmd :: ServerCmd -> GroupState -> IO ()
+broadcastCmd cmd groupState =
+    forM_ (map snd (Map.toList groupState)) sendSink'
+  where
+    sendSink' sink = WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
 
 serve :: String -> Int -> IO ()
 serve host port = do
