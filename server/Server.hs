@@ -31,8 +31,8 @@ dummyGroup = Group { groupId    = 2
     block3 = Block 3 ", obama SUCKS!"
     block4 = Block 4 ", n-word n-word n-word"
     story = [block1, block2]
-    cloud = Cloud (Map.fromList [ (3, (block3, Set.fromList [7]))
-                                , (4, (block4, Set.fromList [8, 12]))
+    cloud = Cloud (Map.fromList [ (3, CloudItem block3 (Set.fromList [7]))
+                                , (4, CloudItem block4 (Set.fromList [8, 12]))
                                 ])
 
 server :: TextProtocol p => Request -> WebSockets p ()

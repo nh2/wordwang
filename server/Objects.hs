@@ -47,8 +47,17 @@ instance IsString BlockContent where
 --   @'Set' ['UserId']@ stores the upvotes.
 --
 --   @{"3": [{"blockId": 3, "content": "hello"}, [5]]}@
-newtype Cloud = Cloud (Map BlockId (Block, Set UserId))
+newtype Cloud = Cloud (Map BlockId CloudItem)
     deriving (Eq, Show, Generic)
+
+data CloudItem
+    = CloudItem { cloudBlock :: Block
+                , cloudUids :: Set UserId
+                }
+      deriving (Eq, Show, Generic)
+
+instance FromJSON CloudItem
+instance ToJSON CloudItem
 
 instance FromJSON Cloud
 instance ToJSON Cloud
