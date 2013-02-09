@@ -27,7 +27,7 @@
     <div id="middle">
 
       <div data-bind="ifnot: joined">
-        <form class="form-inline" data-bind="submit: joinGroup">
+        <form class="form-inline" data-bind="submit: function() { joinGroup(); return false }">
           <input type="text" placeholder="username" data-bind="value: username" />
           <input type="submit" class="btn" title="Join" />
         </form>
@@ -50,7 +50,7 @@
             <ul class="suggestions suggestionsShown"></ul>
           </div>
           <div id="enter">
-            <form data-bind="submit: suggest">
+            <form data-bind="submit: function() { suggestCurrent(); return false }">
               <input type="text" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />
             </form>
           </div>
