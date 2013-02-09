@@ -62,7 +62,8 @@ preJoin serverStateVar rq = WS.acceptRequest rq >> go
                   uid <- makeId serverStateVar
                   gchan <- getCreateGroup serverStateVar mGroupId
                   sink <- getSink
-                  liftIO $ atomically $ writeTChan gchan (ClientMsgFwd uid (Just sink) cmd)
+                  liftIO $ atomically $
+                           writeTChan gchan (ClientMsgFwd uid (Just sink) cmd)
                   runUser serverStateVar uid
               _ -> do
                   liftIO $ putStrLn "Failed parse of join"
