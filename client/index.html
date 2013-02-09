@@ -27,22 +27,21 @@
       <div id="story-container">
         <div class="read-more"></div>
         <!-- ko foreach: story -->
-        <p>
+        <div>
           <span data-bind="text: $data"></span>
-          <ul class="suggestions" data-bind="foreach: $root.suggestions">
-            <li class="suggestion">
-              <span class="block" data-bind="text: $data.block"></span>
-              <span class="votes" data-bind="text: $data.votes"></span>
-            </li>
-          </ul>
-        </p>
+          <div data-bind="if: $index() === $root.story().length - 1" id="next">
+            <ul class="suggestions" data-bind="foreach: $root.suggestions">
+              <li class="suggestion">
+                <span class="block" data-bind="text: $data.block"></span>
+                <span class="votes" data-bind="text: $data.votes"></span>
+              </li>
+            </ul>
+          </div>
+        </div>
         <!-- /ko -->
       </div>
 
       <div class="story_input">
-        <div id="next">
-        </div>
-
         <div id="enter">
           <form data-bind="submit: suggest">
             <input type="text" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />

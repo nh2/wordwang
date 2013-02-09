@@ -15,6 +15,12 @@ class @UI
     new window.suggestion(@suggestion()).add()
     @suggestion ''
 
+  isLastParagraph: (index) =>
+    console.log index
+    console.log @story().length - 1
+    console.log index == @story().length - 1
+    index == @story().length - 1
+
 connectServer = ->
 
 main = ->
