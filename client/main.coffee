@@ -16,31 +16,56 @@ class @UI
     @suggestions = ko.observableArray []
     @username = ko.observable ''
 
-  suggest: (args...) =>
-    @addSuggestion(@suggestion())
+  suggestCurrent: =>
+    @suggest @suggestion()
     @suggestion ''
 
-  refresh: (args) =>
+  refresh: (refresh_info) =>
     @joined true
-    window.args = args
+    window.refresh_info = refresh_info
+
+    # Reset all observables until we have a finer grained method
+    @story []
+    @suggestions []
 
     # Assemble story
-    for entry in args.groupStory
-      @story.push entry.content
+    for entry in refresh_info.groupStory
+      { blockType, blockContent } = entry.content
+      if blockType == 'string'
+        @story.push blockContent
+      else
+        log "WARNING: Ingoring story entry of unknown content:", entry
 
-    for entry in args.groupCloud
-      log "entry", entry
+    for id, entry of refresh_info.groupCloud
       votes = entry.cloudUids.length
-      s = new suggestion(entry.cloudBlock, votes)
-      s.add()
+      { blockId, content } = entry.cloudBlock
+      if content.blockType == 'string'
+        @addSuggestion(content.blockContent, votes, blockId)
+      else
+        log "WARNING: Unhandled cloud content type:", content
 
-  ## Suggestions Manipulation
-  addSuggestion: (block, votes = 0) =>
-    s = new window.Suggestion(block, votes)
-    @suggestions.push(s)
+  # Sends suggestion to the server
+  suggest: (block) =>
+    s = _.findWhere(@suggestions, { block: block })
+    if s
+      log "Upvoting id #{s.id}"
+      @server 'upvote', s.id
+    else
+      log "Sending block #{block}"
+      @server 'send',
+        blockType: 'string'
+        blockContent: block
+
+  # Directly add suggestion to the UI
+  addSuggestion: (block, votes=0, blockId=-1) =>
+    s = new window.Suggestion(block, votes, blockId)
+    log "displaying suggestion", s
+    @suggestions.push s
     @sortSuggestions()
 
   sortSuggestions: =>
+    if @suggestions().length == 0
+      return clearSuggestions
     @suggestions.sort (a,b) -> b.votes() - a.votes()
     setTimeout @rearrangeSuggestions, 0
 
@@ -53,20 +78,29 @@ class @UI
     sug.votes()
 
   joinGroup: =>
-    window.send_json
-      cmd: 'join'
-      args:
-        joinGroupId: null
-        joinUserName: @username()
+    @server 'join',
+      joinGroupId: null
+      joinUserName: @username()
 
-    false # to prevent submit
+  server: (cmd, args) =>
+    o =
+      cmd: cmd
+      args: args
+    log '-> server: ', o
+    window.send_json o
+
+  clearSuggestions: =>
+    show = $ '#next ul.suggestionsShown'
+    nxt = $ '#next'
+    show.html ''
+    nxt.height 0
+
 
   rearrangeSuggestions: =>
     show = $ '#next ul.suggestionsShown'
     orig = $ '#next ul.suggestions:not(.suggestionsShown)'
     cont = $ 'div.story_input'
     nxt = $ '#next'
-    log nxt
 
     # Move hidden ul which uses knockout
     oh = orig.outerHeight true
@@ -122,7 +156,7 @@ connectServer = (ui) ->
 
   ws.onmessage = (data) ->
     msg = JSON.parse(data.data)
-    console.log 'Received', msg
+    console.log '<- server', msg
     dispatch = dispatcher[msg.cmd]
     if dispatch?
       dispatch(msg.args)

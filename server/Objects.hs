@@ -37,12 +37,11 @@ type Id = Int
 data Block = Block
     { blockId :: BlockId
     , content :: BlockContent
-    } deriving (Eq, Show, Generic)
+    } deriving (Eq, Show, Generic, Read)
 type BlockId = Id
-data BlockContent
-    = StringBlock Text
-    | CloseBlock
-    deriving (Eq, Show, Generic)
+data BlockContent = StringBlock Text
+                  | CloseBlock
+    deriving (Eq, Show, Generic, Read)
 
 instance Hashable BlockContent
 instance Hashable Block

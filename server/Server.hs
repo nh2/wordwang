@@ -3,9 +3,11 @@ module Server where
 
 import           Control.Concurrent (forkIO, threadDelay)
 import qualified Control.Exception as CE
+import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Data (Data, Typeable)
+import           Data.Digest.Pure.SHA (sha1, showDigest)
 import           Control.Exception ( Exception )
-import           Control.Monad (forever, forM_, void)
+import           Control.Monad (forever, forM, forM_, void, unless, filterM)
 import           Control.Monad.Trans (MonadIO(..))
 import           Data.List (maximumBy)
 import           Data.Ord (comparing)
@@ -20,12 +22,16 @@ import qualified Data.Aeson as Aeson
 import           Network.WebSockets
                  (Request, WebSockets, runServer, Hybi00, Sink, getSink)
 import qualified Network.WebSockets as WS
+import           System.Directory ( createDirectory, doesDirectoryExist
+                                  , getDirectoryContents, doesFileExist )
+import           System.FilePath ( (</>) )
 
 import           Objects
 
 data ServerState = ServerState
-    { serverGroups  :: Map GroupId GroupChan
-    , serverCounter :: Int
+    { serverGroups    :: Map GroupId GroupChan
+    , serverCounter   :: Int
+    , finishedStories :: [Story]
     }
 
 type GroupChan = TChan GroupCmd
@@ -109,6 +115,10 @@ getCreateGroup serverStateVar (Just gid) = liftIO $
 _TICK_DELAY :: Int
 _TICK_DELAY = 5
 
+-- Where are stories saved on disk?
+_STORY_DIR :: FilePath
+_STORY_DIR = "stories"
+
 createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m GroupChan
 createGroup serverStateVar gid = liftIO $
     do let group = Group { groupId = gid
@@ -122,7 +132,8 @@ createGroup serverStateVar gid = liftIO $
               writeTVar serverStateVar
                         (serverState { serverGroups = Map.insert gid groupChan gs })
        spawnFlushCloud _TICK_DELAY groupChan
-       _ <- forkIO (runGroup group
+       _ <- forkIO (runGroup serverStateVar
+                             group
                              (GroupState {groupSinks = Map.empty, groupCount = 0})
                              groupChan)
        return groupChan
@@ -131,8 +142,9 @@ spawnFlushCloud :: (MonadIO m, Functor m) => Int -> GroupChan -> m ()
 spawnFlushCloud secs gchan = void . liftIO . forkIO $
     do threadDelay (secs * 1000000); atomically $ writeTChan gchan Timeout
 
-runGroup :: Group -> GroupState -> GroupChan -> IO ()
-runGroup group@Group{ groupUsers = gusers
+runGroup :: TVar ServerState -> Group -> GroupState -> GroupChan -> IO ()
+runGroup serverStateVar
+         group@Group{ groupUsers = gusers
                     , groupCloud = cloud@(Cloud votes _)
                     , groupStory = story }
          gs@GroupState{ groupSinks = sinks
@@ -147,7 +159,7 @@ runGroup group@Group{ groupUsers = gusers
                               group' = group { groupUsers = Map.insert uid
                                                             (User uid uname) gusers }
                           broadcastCmd (Refresh group') gs'
-                          runGroup group' gs' gchan
+                          runGroup serverStateVar group' gs' gchan
                    (Nothing, Send blockContent) ->
                        do let bid = count
                               gs' = gs {groupCount = count + 1}
@@ -155,24 +167,34 @@ runGroup group@Group{ groupUsers = gusers
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
                           broadcastCmd (Refresh group') gs'
-                          runGroup group' gs' gchan
+                          runGroup serverStateVar group' gs' gchan
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
                            Just cloud' ->
                                do let group' = group {groupCloud = cloud'}
                                   broadcastCmd (Refresh group') gs
-                                  runGroup group' gs gchan
+                                  runGroup serverStateVar group' gs gchan
                            Nothing -> undefined
-                   _ -> do liftIO (print (uid, cmd)); runGroup group gs gchan
+                   _ -> do liftIO (print (uid, cmd))
+                           runGroup serverStateVar group gs gchan
            Timeout ->
                case maxBlock (map snd (Map.toList votes)) of
                    Nothing -> do spawnFlushCloud _TICK_DELAY gchan
-                                 runGroup group gs gchan
-                   Just b -> do let group' = group { groupStory = b : story
+                                 runGroup serverStateVar group gs gchan
+                   Just Block {content = CloseBlock} ->
+                       do putStrLn "Closed story"
+                          atomically $
+                              do serverState@ServerState {finishedStories = fss} <-
+                                     readTVar serverStateVar
+                                 writeTVar serverStateVar serverState {finishedStories = story : fss}
+                          forever $ do liftIO $ putStrLn "Dropping message"
+                                       _ <- atomically $ readTChan gchan
+                                       broadcastCmd (Refresh group) gs
+                   Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
                                 broadcastCmd (Refresh group') gs
-                                runGroup group' gs gchan
+                                runGroup serverStateVar group' gs gchan
     where
       maxBlock [] = Nothing
       maxBlock xs = Just (cloudBlock (maximumBy (comparing (Set.size . cloudUids)) xs))
@@ -184,6 +206,30 @@ broadcastCmd cmd GroupState{groupSinks = sinks} =
   where
     sendSink' sink = WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
 
+-- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
+saveStories :: (MonadIO m) => [Story] -> m ()
+saveStories ss = liftIO $
+    do _ <- printf "Saving %d stories\n" (length ss)
+       dirExists <- doesDirectoryExist _STORY_DIR
+       unless dirExists $ createDirectory _STORY_DIR
+       forM_ ss $ \story ->
+           do let storyText = BL.pack (show story)
+              BL.writeFile (_STORY_DIR </> (showDigest (sha1 storyText))) storyText
+
+-- | Load stories from "_STORY_DIR/*".  If the directory does not exist, returns an empty
+-- list.
+loadStories :: (MonadIO m) => m [Story]
+loadStories = liftIO $
+    do putStrLn "Loading stories"
+       dirExists <- doesDirectoryExist _STORY_DIR
+       if dirExists
+           then do fs <- getDirectoryContents _STORY_DIR
+                   fs' <- filterM doesFileExist fs
+                   forM fs' $ \f ->
+                       do text <- BL.readFile f
+                          return (read (BL.unpack text))
+           else return []
+
 data Shutdown = Shutdown
               deriving ( Data, Show, Typeable )
 
@@ -193,8 +239,14 @@ instance Exception Shutdown
 --   and return an action that shuts down the server.
 serve :: String -> Int -> IO (IO ())
 serve host port =
-    do tid <- forkIO $
-           CE.handle (\(_ :: Shutdown) -> return ()) $ do
-               serverState <- newTVarIO (ServerState Map.empty 0)
-               runServer host port (preJoin serverState)
-       return (CE.throwTo tid Shutdown)
+    do initialStories <- loadStories
+       serverState <- newTVarIO (ServerState { serverGroups    = Map.empty
+                                             , serverCounter   = 0
+                                             , finishedStories = initialStories })
+       tid <- forkIO $
+           CE.handle (\(_ :: Shutdown) -> return ())
+               (runServer host port (preJoin serverState))
+       return (do CE.throwTo tid Shutdown
+                  ServerState{finishedStories = stories} <-
+                              atomically $ readTVar serverState
+                  saveStories stories)

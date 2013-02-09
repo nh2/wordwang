@@ -21,6 +21,8 @@
           sock.send("{\"cmd\": \"join\", \"args\": {\"joinGroupId\": null, \"joinUserName\": \"francesco\"}}");
           sock.send("{\"cmd\": \"send\", \"args\": {\"blockType\": \"string\", \"blockContent\": \"hello\"}}");
           sock.send("{\"cmd\": \"upvote\", \"args\": 0}");
+          sock.send("{\"cmd\": \"send\", \"args\": {\"blockType\": \"close\"}}");
+          sock.send("{\"cmd\": \"send\", \"args\": {\"blockType\": \"string\", \"blockContent\": \"hello\"}}");
       };
       sock.onmessage = function(event) {
           log.innerHTML += "Received data: " + event.data + "<br>";
