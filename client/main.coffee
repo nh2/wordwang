@@ -42,12 +42,13 @@ class @UI
 
   sortSuggestions: =>
     @suggestions.sort (a,b) -> b.votes() - a.votes()
+    setTimeout @rearrangeSuggestions, 0
 
-  setSuggestionVotes: (sug, newv) ->
+  setSuggestionVotes: (sug, newv) =>
     sug.votes newv
     @sortSuggestions()
 
-  maxSuggestionVotes: ->
+  maxSuggestionVotes: =>
     sug = _.max @suggestions(), (sug) -> sug.votes()
     sug.votes()
 
@@ -59,6 +60,52 @@ class @UI
         joinUserName: @username()
 
     false # to prevent submit
+
+  rearrangeSuggestions: =>
+    show = $ '#next ul.suggestionsShown'
+    orig = $ '#next ul.suggestions:not(.suggestionsShown)'
+    cont = $ 'div.story_input'
+    nxt = $ '#next'
+    log nxt
+
+    # Move hidden ul which uses knockout
+    oh = orig.outerHeight true
+    ncss =
+      top: -(cont.offset().top + oh)
+      width: cont.width()
+    orig.css ncss
+    nxt.height oh;
+
+    # Apply location from hidden elem to shown elem
+    orig.children().each (i, sug) =>
+      $sug = $ sug
+      block = $("span.block", $sug).html()
+      votes = $("span.votes", $sug).html()
+      hash = (murmurhash3_32_gc block).toString()
+      shown = $ "li.h"+hash, show
+      # Fade in element if not there yet
+      pos = $sug.position()
+      ncss =
+        top: pos.top
+        left: pos.left
+        width: $sug.outerWidth()
+        'font-size': $sug.css 'font-size'
+      if !shown.length
+        ent = $sug.clone()
+        ent.css ncss
+        ent.addClass "h"+hash
+        show.append ent
+        setTimeout =>
+          ent.css "opacity", 1
+          , 0
+      # Animate existing element otherwise
+      else
+        shown.css ncss
+        $("span.votes", shown).html votes
+        setTimeout =>
+          shown.css "opacity", 1
+          , 0
+    #copy.remove()
 
 connectServer = (ui) ->
   window.ws = ws = new WebSocket(WS_URL, "protocolOne")
