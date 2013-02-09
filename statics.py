@@ -32,7 +32,7 @@ STATICS = {
     # Runtogether to run multiple daemons in parallel
     'runtogether.py': 'https://raw.github.com/nh2/runtogether/master/runtogether.py',
 
-    'server/lib/underscore.js': 'http://underscorejs.org/underscore.js',
+    'client/lib/underscore.js': 'http://underscorejs.org/underscore.js',
 
     # Browser testing
     'client/css/lib/mocha.css': 'https://raw.github.com/visionmedia/mocha/master/mocha.css',
