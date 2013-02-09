@@ -35,8 +35,11 @@
 
       <div class="story_input">
         <div id="next">
-          <ul data-bind="foreach: suggestions">
-            <li data-bind="text: $data.block"></li>
+          <ul class="suggestions" data-bind="foreach: suggestions">
+            <li class="suggestion">
+              <span class="block" data-bind="text: $data.block"></span>
+              <span class="votes" data-bind="text: $data.votes"></span>
+            </li>
           </ul>
         </div>
 

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <title>WebSocket test</title>
+  </head>
+  <body>
+    <h1>WebSocket test</h1>
+
+    <div id="log">
+    </div>
+
+    <script type="text/javascript">
+      sock = new WebSocket("ws://localhost:8888");
+      console.log("Created socket");
+      log = document.getElementById("log");
+      sock.onopen = function () {
+          log.innerHTML += "Socket open!<br>";
+          log.innerHTML += "Sending data...<br>";
+          sock.send("This is a message.");
+      };
+      sock.onmessage = function(event) {
+          log.innerHTML += "Received data: " + event.data + "<br>";
+      };
+      sock.onclose = function (event) {
+          log.innerHTML += "Socket close!<br>";
+      };
+    </script>
+  </body>
+</html>

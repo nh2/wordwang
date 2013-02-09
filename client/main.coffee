@@ -56,9 +56,14 @@ class @UI
     @suggestion ''
 
 
+connectServer: ->
+
+
 main = ->
   window.ui = new UI()
   ko.applyBindings(ui)
+
+  connectServer()
 
 
 $ ->

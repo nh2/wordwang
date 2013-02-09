@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-module Object where
+module Objects where
 
 import           Control.Applicative ((<$>))
 import           Control.Monad (mzero)
