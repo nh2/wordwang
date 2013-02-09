@@ -12,6 +12,7 @@
     <script type='text/javascript' src='js/lib/knockout.js'></script>
 
     <script type="text/coffeescript" src="main.coffee"></script>
+    <script type="text/coffeescript" src="js/fixtures.coffee"></script>
 
     <script type="text/javascript" src="http://localhost:8001/vogue-client.js"></script>
 
@@ -26,7 +27,7 @@
       <div class="story_input">
         <div id="next">
           <ul data-bind="foreach: suggestions">
-            <li data-bind="text: $data">
+            <li data-bind="text: $data.block">
               NEXT CHOICES
             </li>
           </ul>

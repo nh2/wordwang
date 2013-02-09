@@ -18,6 +18,7 @@ class @UI
     @suggestions.push(s)
     @suggestion ''
 
+
 main = ->
   window.ui = new UI()
   ko.applyBindings(ui)
