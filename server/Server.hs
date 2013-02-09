@@ -188,7 +188,7 @@ runGroup serverStateVar
                           forever $ do liftIO $ putStrLn "Dropping message"
                                        _ <- atomically $ readTChan gchan
                                        broadcastCmd (Refresh group) gs
-                   Just b -> do let group' = group { groupStory = b : story
+                   Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
                                 broadcastCmd (Refresh group') gs
