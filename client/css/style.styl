@@ -36,14 +36,18 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
   vertical-align: top
 
   ul.suggestions
+    margin: 1em 0;
     list-style: none
-    padding: .5em 1em
+    line-height: 40px
+
     li.suggestion
       transition: font-size 0.3s
       -webkit-transition: font-size 0.3s
-      display: inline
+      display: inline-block
       padding: .1em .2em
+      vertical-align: middle
+
       span.votes
-        background: #cd853f
+        border: 1px solid #333
         border-radius: .3em
         padding: .1em .2em
