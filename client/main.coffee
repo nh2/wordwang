@@ -50,14 +50,10 @@ class @UI
     @suggestions = ko.observableArray []
 
   suggest: (args...) ->
-    s = @suggestion()
-    log "suggest", s
-    @suggestions.push(s)
+    new window.suggestion(@suggestion()).add()
     @suggestion ''
 
-
 connectServer: ->
-
 
 main = ->
   window.ui = new UI()

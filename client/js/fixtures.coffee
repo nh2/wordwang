@@ -1,15 +1,21 @@
-suggestions1 = [
-  { block: 'once', votes: 3 }
-  { block: 'there', votes: 1 }
-  { block: 'was', votes: 0 }
-  { block: 'went', votes: 2 }
-]
+class @suggestion
+  constructor: (block, votes=0) ->
+    @block = block
+    @votes = votes
+
+  add: ->
+    log "#{@block} with #{@votes} votes added to list"
+    window.ui.suggestions.push(@)
+    window.ui.sortSuggestions()
 
 @UI::sortSuggestions = ->
-  @suggestions = @suggestions.sort (a,b) -> b.votes - a.votes
+  @suggestions.sort (a,b) -> b.votes - a.votes
 
-@s1 = ->
-  @ui.suggestions suggestions1
-
-@s1()
-@ui.sortSuggestions()
+do ->
+  new suggestion('once', 1).add()
+  new suggestion('there', 3).add()
+  new suggestion('was', 2).add()
+  new suggestion('a', 7).add()
+  new suggestion('an', 5).add()
+  new suggestion('old', 10).add()
+  new suggestion('man', 6).add()
