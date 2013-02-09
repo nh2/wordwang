@@ -1,3 +1,6 @@
+minFont = 12
+maxFont = 25
+
 class @suggestion
   constructor: (block, votes=0) ->
     @block = ko.observable(block)
@@ -14,10 +17,8 @@ class @suggestion
     window.ui.sortSuggestions()
 
   calcFontSize: ->
-      min = 12
-      max = 25
-      size = (max - (@maxVotes() - @votes()))
-      size = if size < min then min else size
+      size = (maxFont - (@maxVotes() - @votes()))
+      size = if size < minFont then minFont else size
       size + "px"
 
   maxVotes: ->
