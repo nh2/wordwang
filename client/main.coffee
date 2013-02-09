@@ -7,14 +7,26 @@
 
 WS_URL = "ws://localhost:8888/"
 
-
 class @UI
   constructor: ->
     @joined = ko.observable false
     @story = ko.observableArray []
+    @storyParagraphs = ko.computed @paragraphs
     @suggestion = ko.observable ''
     @suggestions = ko.observableArray []
     @username = ko.observable ''
+
+  paragraphs: =>
+    paragraphs = []
+    paragraph = []
+    for block, index in @story()
+      paragraph.push block
+      if index % 5 == 4
+        paragraphs.push paragraph
+        paragraph = []
+    if paragraph.length > 0
+      paragraphs.push paragraph
+    paragraphs
 
   suggest: (args...) =>
     @addSuggestion(@suggestion())

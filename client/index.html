@@ -22,7 +22,6 @@
   </head>
 
   <body>
-
     <div id="middle">
 
       <div data-bind="ifnot: joined">
@@ -34,8 +33,10 @@
       <div data-bind="if: joined">
         <div id="story-container">
           <div class="read-more"></div>
-          <div data-bind="foreach: story">
-            <span data-bind="text: $data"></span>
+          <div data-bind="foreach: storyParagraphs">
+            <p data-bind="foreach: $data">
+              <span data-bind="text: $data"></span>
+            </p>
           </div>
         </div>
 
