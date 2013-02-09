@@ -26,7 +26,9 @@ data ServerState = ServerState { serverGroups  :: Map GroupId GroupChan
                                , serverCounter :: Int }
 
 type GroupChan = TChan GroupCmd
-type GroupState = Map UserId (Sink WebSocketProtocol)
+data GroupState = GroupState { groupSinks :: Map UserId (Sink WebSocketProtocol)
+                             , groupCount :: Int
+                             }
 
 type WebSocketProtocol = Hybi00
 
@@ -105,35 +107,53 @@ getCreateGroup serverStateVar (Just gid) = liftIO $ do
 
 createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m GroupChan
 createGroup serverStateVar gid = liftIO $ do
-    let groupState = Group { groupId = gid
-                           , groupUsers = Map.empty
-                           , groupStory = []
-                           , groupCloud = Cloud Map.empty
-                           }
+    let group = Group { groupId = gid
+                      , groupUsers = Map.empty
+                      , groupStory = []
+                      , groupCloud = Cloud Map.empty
+                      }
     groupChan <- newTChanIO
     atomically $ do
         serverState@ServerState {serverGroups = gs} <- readTVar serverStateVar
         writeTVar serverStateVar
                   (serverState { serverGroups = Map.insert gid groupChan gs })
-    _ <- forkIO (runGroup groupState Map.empty groupChan)
+    _ <- forkIO (runGroup group (GroupState {groupSinks = Map.empty, groupCount = 0})
+                          groupChan)
     return groupChan
 
 runGroup :: Group -> GroupState -> GroupChan -> IO ()
-runGroup group@Group{groupUsers = gusers} gs gchan = do
+runGroup group@Group{groupUsers = gusers, groupCloud = Cloud gcloud}
+         gs@GroupState{groupSinks = sinks, groupCount = count} gchan = do
     ClientCmdFwd uid mSink cmd <- atomically $ readTChan gchan
     case (mSink, cmd) of
         (Just sink, Join (JoinPayload uname _)) ->
-            do let gs' = Map.insert uid sink gs
+            do let gs' = gs {groupSinks = Map.insert uid sink sinks}
                    group' = group {groupUsers = Map.insert uid (User uid uname) gusers}
                broadcastCmd (Refresh group') gs'
                runGroup group' gs' gchan
-        (Nothing, Send blockContent) -> undefined
-        (Nothing, Upvote bid) -> undefined
-        _ -> fail "Malformed ClientCmdFwd"
+        (Nothing, Send blockContent) ->
+            do let bid = count
+                   gs' = gs {groupCount = count + 1}
+                   gcloud' = Map.insert bid
+                             (Block bid blockContent, Set.fromList [uid]) gcloud
+                   group' = group {groupCloud = Cloud gcloud'}
+               broadcastCmd (Refresh group') gs'
+               runGroup group' gs' gchan
+        (Nothing, Upvote bid) ->
+            do let mgvotes = Map.lookup bid gcloud
+               case mgvotes of
+                   Nothing -> undefined
+                   Just (b, uids) ->
+                       do let gcloud' = Map.insert bid (b, Set.insert uid uids) gcloud
+                              group' = group {groupCloud = Cloud gcloud'}
+                          broadcastCmd (Refresh group') gs
+                          runGroup group' gs gchan
+        _ -> do liftIO (print (uid, cmd)); runGroup group gs gchan
 
 broadcastCmd :: ServerCmd -> GroupState -> IO ()
-broadcastCmd cmd groupState =
-    forM_ (map snd (Map.toList groupState)) sendSink'
+broadcastCmd cmd GroupState{groupSinks = sinks} =
+    do putStrLn (show cmd)
+       forM_ (map snd (Map.toList sinks)) sendSink'
   where
     sendSink' sink = WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
 
