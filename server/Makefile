@@ -3,7 +3,6 @@ all: build test
 .PHONY: all build dist install clean doc p test ghci
 
 build: dist/setup-config
-	rm -rf _site _cache
 	cabal-dev build
 
 dist:
