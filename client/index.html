@@ -12,6 +12,7 @@
     <script type="text/javascript" src="js/lib/jquery.js"></script>
     <script type='text/javascript' src='js/lib/knockout.js'></script>
     <script type='text/javascript' src='js/lib/underscore.js'></script>
+    <script type='text/javascript' src='js/lib/murmurhash.js'></script>
 
     <script type="text/coffeescript" src="main.coffee"></script>
     <script type="text/coffeescript" src="js/suggestion.coffee"></script>
@@ -34,13 +35,10 @@
       <div data-bind="if: joined">
         <div id="story-container">
           <div class="read-more"></div>
-          <!-- ko foreach: story -->
-          <div>
+          <div data-bind="foreach: story">
             <span data-bind="text: $data"></span>
           </div>
-          <!-- /ko -->
         </div>
-
         <div class="story_input">
           <div id="next">
             <ul class="suggestions" data-bind="foreach: $root.suggestions">
@@ -49,6 +47,7 @@
                 <span class="votes" data-bind="text: $data.votes"></span>
               </li>
             </ul>
+            <ul class="suggestions suggestionsShown"></ul>
           </div>
           <div id="enter">
             <form data-bind="submit: suggest">

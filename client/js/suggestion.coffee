@@ -10,4 +10,3 @@ class @Suggestion
     size = (@maxFont - (window.ui.maxSuggestionVotes() - @votes()))
     size = if size < @minFont then @minFont else size
     size + "px"
-
