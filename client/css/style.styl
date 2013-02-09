@@ -2,29 +2,31 @@ COLOR_TEXT_HIGHLIGHT = #a2b5c6
 COLOR_TEXT_LIGHT = #bccddc
 COLOR_TEXT_GRAY = #68727b
 
-linear-gradient()
-  background: -moz-linear-gradient(arguments)
-  background: -webkit-linear-gradient(arguments)
-  background: -o-linear-gradient(arguments)
-
+background-linear-gradient(startPoint, startColor, startInterval, endColor, endInterval, deprecatedWebkitStartPoint = false, deprecatedWebkitEndPoint = false)
+  if deprecatedWebkitStartPoint && deprecatedWebkitEndPoint
+    background-image -webkit-gradient(linear, deprecatedWebkitStartPoint, deprecatedWebkitEndPoint, color-stop(startInterval, startColor), color-stop(endInterval, endColor))
+  background-image -webkit-linear-gradient(startPoint, startColor startInterval, endColor endInterval)
+  background-image -moz-linear-gradient(startPoint, startColor startInterval, endColor endInterval)
+  background-image -ms-linear-gradient(startPoint, startColor startInterval, endColor endInterval)
+  background-image -o-linear-gradient(startPoint, startColor startInterval, endColor endInterval)
+  background-image linear-gradient(startPoint, startColor startInterval, endColor endInterval)
 
 #middle
-  background: red
   margin: 0 auto
   width: 45%
 
-  #story
-    display: inline-block
-    background: green
+#end-marker
+  width: 5px
+  height: 5px
+  color: red
 
-  #next
-    display: inline-block
-    background: green
+#story-container
+  position: relative
 
-  #enter
-    display: inline-block
-    background: green
-
-    input.enter_text
-      width: 17em
-
+.read-more
+  position: absolute
+  left: 0
+  top: 0
+  right: 0
+  bottom: 0
+  background-linear-gradient(top, white, 0%, #FFFFFF00, 10%)

@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Wordwang</title>
     <link rel="stylesheet" type="text/css" href="gen/style.css" />
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.0/css/bootstrap-combined.min.css" rel="stylesheet">
 
     <!-- Called CoffeeScript.js instead of coffee-script.js for require-cs -->
     <script type="text/javascript" src="js/lib/CoffeeScript.js"></script>
@@ -22,20 +23,26 @@
 
     <div id="middle">
 
-      <div id="story" data-bind="text: story"></div>
+      <div id="story-container">
+        <div class="read-more"></div>
+        <!-- ko foreach: story -->
+        <p>
+          <span data-bind="text: $data"></span>
+          <span id="end-marker">end</span>
+        </p>
+        <!-- /ko -->
+      </div>
 
       <div class="story_input">
         <div id="next">
           <ul data-bind="foreach: suggestions">
-            <li data-bind="text: $data.block">
-              NEXT CHOICES
-            </li>
+            <li data-bind="text: $data.block"></li>
           </ul>
         </div>
 
         <div id="enter">
           <form data-bind="submit: suggest">
-            <input type="text" class="enter_text" placeholder="Suggest how the story continues ..." data-bind="value: suggestion, hasfocus: true" />
+            <input type="text" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />
           </form>
         </div>
       </div>
