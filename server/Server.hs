@@ -164,7 +164,7 @@ runGroup group@Group{groupUsers = gusers, groupCloud = Cloud gcloud, groupStory 
                             broadcastCmd (Refresh group') gs
                             runGroup group' gs gchan
             _ -> do liftIO (print (uid, cmd)); runGroup group gs gchan
-      Timeout -> case minBlock (map snd $ Map.toList gcloud) of
+      Timeout -> case maxBlock (map snd $ Map.toList gcloud) of
                    Nothing -> do
                      spawnFlushCloud _TICK_DELAY gchan
                      runGroup group gs gchan
@@ -175,11 +175,11 @@ runGroup group@Group{groupUsers = gusers, groupCloud = Cloud gcloud, groupStory 
                           broadcastCmd (Refresh group') gs
                           runGroup group' gs gchan
     where
-      minBlock :: [(Block, Set.Set UserId)] -> Maybe (Block, Int)
-      minBlock [] = Nothing
-      minBlock [(b, s)] = Just (b, Set.size s)
-      minBlock ((b, s) : as) = do let n = Set.size s
-                                  (b2, m) <- minBlock as
+      maxBlock :: [(Block, Set.Set UserId)] -> Maybe (Block, Int)
+      maxBlock [] = Nothing
+      maxBlock [(b, s)] = Just (b, Set.size s)
+      maxBlock ((b, s) : as) = do let n = Set.size s
+                                  (b2, m) <- maxBlock as
                                   return $ if n < m then (b2, m) else (b, n)
 
 broadcastCmd :: ServerCmd -> GroupState -> IO ()
