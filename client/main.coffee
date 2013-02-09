@@ -64,6 +64,8 @@ class @UI
     @sortSuggestions()
 
   sortSuggestions: =>
+    if @suggestions().length == 0
+      return clearSuggestions
     @suggestions.sort (a,b) -> b.votes() - a.votes()
     setTimeout @rearrangeSuggestions, 0
 
@@ -86,6 +88,13 @@ class @UI
       args: args
     log '-> server: ', o
     window.send_json o
+
+  clearSuggestions: =>
+    show = $ '#next ul.suggestionsShown'
+    nxt = $ '#next'
+    show.html ''
+    nxt.height 0
+
 
   rearrangeSuggestions: =>
     show = $ '#next ul.suggestionsShown'
