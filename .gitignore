@@ -1,0 +1,8 @@
+server/lib/
+client/css/lib/
+client/gen/
+client/js/lib/
+*.log
+*.pyc
+runtogether.py
+staticfetcher.py

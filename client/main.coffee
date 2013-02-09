@@ -12,18 +12,16 @@ class @UI
     @suggestions = ko.observableArray []
 
   suggest: (args...) ->
-    s = @suggestion()
-    log "suggest", s
-    @suggestions.push(s)
+    new window.suggestion(@suggestion()).add()
     @suggestion ''
 
-connectServer: ->
+connectServer = ->
 
 main = ->
   window.ui = new UI()
   ko.applyBindings(ui)
 
-  connectServer()
+  #connectServer()
 
 $ ->
   # Unfortunately not all browsers have window.location.origin

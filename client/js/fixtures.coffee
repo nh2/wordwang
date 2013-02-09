@@ -43,12 +43,6 @@ Say you stop the war (yee that's right, c'mon)",
 My family, my friends. Nobody wants war. Life is short
 Yee, c'mon, that's right. Check."]
 
-@UI::sortSuggestions = ->
-  @suggestions = @suggestions.sort (a,b) -> b.votes - a.votes
-
-@s1 = ->
-  @ui.suggestions suggestions1
-  @ui.story story1
-
-@s1()
-@ui.sortSuggestions()
+window.fixture1 = ->
+  window.ui.suggestions suggestions1
+  window.ui.story story1
