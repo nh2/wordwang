@@ -41,4 +41,4 @@ server rq = do WS.acceptRequest rq; go
     go = forever $
        do msg <- WS.receiveData
           liftIO (Text.putStrLn msg)
-          WS.sendTextData (Aeson.encode (Aeson.toJSON dummyGroup))
+          WS.sendTextData (Aeson.encode (Aeson.toJSON (Refresh dummyGroup)))
