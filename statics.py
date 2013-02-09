@@ -15,7 +15,7 @@ STATICS = {
     'client/js/lib/knockout.js': 'http://knockoutjs.com/downloads/knockout-2.2.1.js',
     'client/js/lib/knockout.mapping.js': 'https://raw.github.com/SteveSanderson/knockout.mapping/master/build/output/knockout.mapping-latest.js',
 
-    # 'lib/jsschema.js': 'https://raw.github.com/nh2/jsschema/schemafields/jsschema.js',
+    'client/js/lib/jsschema.js': 'https://raw.github.com/nh2/jsschema/newschema/jsschema.js',
     # 'runtogether.py': 'https://raw.github.com/nh2/runtogether/master/runtogether.py',
 
     'client/js/lib/jquery.js': 'http://code.jquery.com/jquery.min.js',
