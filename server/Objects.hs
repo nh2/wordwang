@@ -130,11 +130,11 @@ instance ToJSON ClientCmd where
 instance FromJSON ClientCmd where
     parseJSON js =
         do (name, args) <- jsonCmd js
-           case () of
-            _ | name == "send"   -> Send   <$> parseJSON args
-            _ | name == "upvote" -> Upvote <$> parseJSON args
-            _ | name == "join"   -> Join   <$> parseJSON args
-            _                    -> mzero
+           case name of
+               "send"   -> Send   <$> parseJSON args
+               "upvote" -> Upvote <$> parseJSON args
+               "join"   -> Join   <$> parseJSON args
+               _        -> mzero
 
 -- | Messages sent by the server to the client
 --
@@ -158,4 +158,6 @@ instance ToJSON ServerCmd where
 instance FromJSON ServerCmd where
     parseJSON js =
         do (name, args) <- jsonCmd js
-           if name == "refresh" then Refresh <$> parseJSON args else mzero
+           case name of
+               "refresh" -> Refresh <$> parseJSON args
+               _         -> mzero
