@@ -52,4 +52,7 @@ Test-suite gold
                         ansi-terminal
   Ghc-Options:          -Wall
 
-  Build-Depends:        test-framework, test-framework-hunit, HUnit
+  Build-Depends:        bytestring,
+                        test-framework,
+                        test-framework-hunit,
+                        HUnit
