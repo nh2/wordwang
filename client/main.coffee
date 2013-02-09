@@ -10,17 +10,18 @@ WS_URL = "ws://localhost:8888/"
 
 class @UI
   constructor: ->
-
+    @joined = ko.observable false
     @story = ko.observableArray []
     @suggestion = ko.observable ''
     @suggestions = ko.observableArray []
+    @username = ko.observable ''
 
   suggest: (args...) =>
     @addSuggestion(@suggestion())
     @suggestion ''
 
   refresh: (args) =>
-    log args
+    @joined true
     window.args = args
 
     # Assemble story
@@ -50,24 +51,36 @@ class @UI
     sug = _.max @suggestions(), (sug) -> sug.votes()
     sug.votes()
 
+  joinGroup: =>
+    window.send_json
+      cmd: 'join'
+      args:
+        joinGroupId: null
+        joinUserName: @username()
+
+    false # to prevent submit
 
 connectServer = (ui) ->
-  ws = new WebSocket(WS_URL, "protocolOne")
+  window.ws = ws = new WebSocket(WS_URL, "protocolOne")
 
   window.debug_ping = ->
     ws.send 'ping'
+
+  window.send_json = (data) ->
+    console.log 'Sent', data
+    ws.send JSON.stringify data
 
   dispatcher =
     'refresh': ui.refresh
 
   ws.onmessage = (data) ->
     msg = JSON.parse(data.data)
+    console.log 'Received', msg
     dispatch = dispatcher[msg.cmd]
     if dispatch?
       dispatch(msg.args)
     else
       throw new Error('dispatcher error: ' + msg.cmd)
-
 
 main = ->
   window.ui = ui = new UI()

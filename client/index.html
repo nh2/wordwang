@@ -25,31 +25,38 @@
 
     <div id="middle">
 
-      <div id="story-container">
-        <div class="read-more"></div>
-        <!-- ko foreach: story -->
-        <div>
-          <span data-bind="text: $data"></span>
-        </div>
-        <!-- /ko -->
+      <div data-bind="ifnot: joined">
+        <form class="form-inline" data-bind="submit: joinGroup">
+          <input type="text" placeholder="username" data-bind="value: username" />
+          <input type="submit" class="btn" title="Join" />
+        </form>
       </div>
-
-      <div class="story_input">
-        <div id="next">
-          <ul class="suggestions" data-bind="foreach: $root.suggestions">
-            <li class="suggestion" data-bind="style: { fontSize: $data.calcFontSize() }">
-              <span class="block" data-bind="text: $data.block"></span>
-              <span class="votes" data-bind="text: $data.votes"></span>
-            </li>
-          </ul>
+      <div data-bind="if: joined">
+        <div id="story-container">
+          <div class="read-more"></div>
+          <!-- ko foreach: story -->
+          <div>
+            <span data-bind="text: $data"></span>
+          </div>
+          <!-- /ko -->
         </div>
-        <div id="enter">
-          <form data-bind="submit: suggest">
-            <input type="text" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />
-          </form>
+
+        <div class="story_input">
+          <div id="next">
+            <ul class="suggestions" data-bind="foreach: $root.suggestions">
+              <li class="suggestion" data-bind="style: { fontSize: $data.calcFontSize() }">
+                <span class="block" data-bind="text: $data.block"></span>
+                <span class="votes" data-bind="text: $data.votes"></span>
+              </li>
+            </ul>
+          </div>
+          <div id="enter">
+            <form data-bind="submit: suggest">
+              <input type="text" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />
+            </form>
+          </div>
         </div>
       </div>
-
     </div>
   </body>
 
