@@ -15,12 +15,24 @@ class @UI
     @suggestion = ko.observable ''
     @suggestions = ko.observableArray []
 
-  suggest: (args...) ->
+  suggest: (args...) =>
     new window.suggestion(@suggestion()).add()
     @suggestion ''
 
-  refresh: (args) ->
+  refresh: (args) =>
     log args
+    window.args = args
+
+    # Assemble story
+    for entry in args.groupStory
+      @story.push entry.content
+
+    for entry in args.groupCloud
+      log "entry", entry
+      votes = entry.cloudUids.length
+      s = new suggestion(entry.cloudBlock, votes)
+      s.add()
+
 
 
 connectServer = (ui) ->
