@@ -74,6 +74,9 @@ data Cloud = Cloud (Map BlockId CloudItem)
                    (HashSet Block)
     deriving (Eq, Show, Generic)
 
+instance ToJSON Cloud where
+    toJSON (Cloud votes _) = toJSON votes
+
 data CloudItem
     = CloudItem { cloudBlock :: Block
                 , cloudUids :: Set UserId
@@ -101,9 +104,6 @@ upvoteBlock bid uid (Cloud votes hs) =
         Nothing -> Nothing
         Just (CloudItem b voters) ->
             Just (Cloud (Map.insert bid (CloudItem b $ Set.insert uid voters) votes) hs)
-
-instance FromJSON Cloud
-instance ToJSON Cloud
 
 -- | @{"userId": 5, "userName": "francesco"}@
 data User = User
@@ -134,7 +134,6 @@ data Group = Group
 type GroupId = Id
 type Story = [Block]
 
-instance FromJSON Group
 instance ToJSON Group
 
 -------------------------------------------------------------------------------
@@ -196,12 +195,12 @@ data ServerCmd = Refresh Group  -- ^ After any event change, the server sends
 instance ToJSON ServerCmd where
     toJSON (Refresh group) = cmdJSON "refresh" group
 
-instance FromJSON ServerCmd where
-    parseJSON js =
-        do (name, args)  <- jsonCmd js
-           case name of
-               "refresh" -> Refresh <$> parseJSON args
-               _         -> mzero
+-- instance FromJSON ServerCmd where
+--     parseJSON js =
+--         do (name, args)  <- jsonCmd js
+--            case name of
+--                "refresh" -> Refresh <$> parseJSON args
+--                _         -> mzero
 
 -- Utils
 
