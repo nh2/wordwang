@@ -29,5 +29,8 @@ p:
 	             *.cabal \
 	             Makefile
 
+run: build
+	dist/build/wordwang/wordwang
+
 ghci: build
 	cabal-dev ghci
