@@ -30,10 +30,10 @@ type Id = Int
 data Block = Block
     { blockId :: BlockId
     , content :: BlockContent
-    } deriving (Eq, Show, Generic)
+    } deriving (Eq, Show, Generic, Read)
 type BlockId = Id
 data BlockContent = StringBlock Text
-    deriving (Eq, Show, Generic)
+    deriving (Eq, Show, Generic, Read)
 
 instance FromJSON Block
 instance ToJSON Block

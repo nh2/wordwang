@@ -3,9 +3,11 @@ module Server where
 
 import           Control.Concurrent (forkIO, threadDelay)
 import qualified Control.Exception as CE
+import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Data (Data, Typeable)
+import           Data.Digest.Pure.SHA (sha1, showDigest)
 import           Control.Exception ( Exception )
-import           Control.Monad (forever, forM_, void)
+import           Control.Monad (forever, forM, forM_, void, unless)
 import           Control.Monad.Trans (MonadIO(..))
 import           Data.List (maximumBy)
 import           Data.Ord (comparing)
@@ -20,12 +22,15 @@ import qualified Data.Aeson as Aeson
 import           Network.WebSockets
                  (Request, WebSockets, runServer, Hybi00, Sink, getSink)
 import qualified Network.WebSockets as WS
+import           System.Directory (createDirectory, doesDirectoryExist, getDirectoryContents)
+import           System.FilePath ( (</>) )
 
 import           Objects
 
 data ServerState = ServerState
-    { serverGroups  :: Map GroupId GroupChan
-    , serverCounter :: Int
+    { serverGroups    :: Map GroupId GroupChan
+    , serverCounter   :: Int
+    , finishedStories :: [Story]
     }
 
 type GroupChan = TChan GroupCmd
@@ -109,6 +114,10 @@ getCreateGroup serverStateVar (Just gid) = liftIO $
 _TICK_DELAY :: Int
 _TICK_DELAY = 5
 
+-- Where are stories saved on disk?
+_STORY_DIR :: FilePath
+_STORY_DIR = "stories"
+
 createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m GroupChan
 createGroup serverStateVar gid = liftIO $
     do let group = Group { groupId = gid
@@ -188,6 +197,27 @@ broadcastCmd cmd GroupState{groupSinks = sinks} =
   where
     sendSink' sink = WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
 
+-- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
+saveStories :: (MonadIO m) => [Story] -> m ()
+saveStories ss = liftIO $
+    do dirExists <- doesDirectoryExist _STORY_DIR
+       unless dirExists $ createDirectory _STORY_DIR
+       forM_ ss $ \story ->
+           do let storyText = BL.pack (show story)
+              BL.writeFile (_STORY_DIR </> (showDigest (sha1 storyText))) storyText
+
+-- | Load stories from "_STORY_DIR/*".  If the directory does not exist, returns an empty
+-- list.
+loadStories :: (MonadIO m) => m [Story]
+loadStories = liftIO $
+    do dirExists <- doesDirectoryExist _STORY_DIR
+       if dirExists
+           then do fs <- getDirectoryContents _STORY_DIR
+                   forM fs $ \f ->
+                       do text <- BL.readFile f
+                          return (read (BL.unpack text))
+           else return []
+
 data Shutdown = Shutdown
               deriving ( Data, Show, Typeable )
 
@@ -197,8 +227,11 @@ instance Exception Shutdown
 -- an action that shuts down the server.
 serve :: String -> Int -> IO (IO ())
 serve host port =
-    do tid <- forkIO $
+    do stories <- loadStories
+       tid <- forkIO $
            CE.handle (\(_ :: Shutdown) -> return ()) $ do
-               serverState <- newTVarIO (ServerState Map.empty 0)
+               serverState <- newTVarIO (ServerState { serverGroups    = Map.empty
+                                                     , serverCounter   = 0
+                                                     , finishedStories = stories })
                runServer host port (preJoin serverState)
        return (CE.throwTo tid Shutdown)
