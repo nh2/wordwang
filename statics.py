@@ -19,6 +19,7 @@ STATICS = {
     # 'runtogether.py': 'https://raw.github.com/nh2/runtogether/master/runtogether.py',
 
     'client/js/lib/jquery.js': 'http://code.jquery.com/jquery.min.js',
+    'client/js/lib/jquery-color.js': 'http://code.jquery.com/color/jquery.color-2.1.1.min.js',
     # 'client/js/lib/jquery.cookie.js': 'https://raw.github.com/carhartl/jquery-cookie/master/jquery.cookie.js',
 
     # Raphael for simple graphics manipulation
