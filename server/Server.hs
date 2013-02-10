@@ -3,15 +3,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server where
 
-import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Exception (Exception)
 import qualified Control.Exception as CE
 import           Control.Monad (forever, forM, forM_, void, unless, filterM)
-import           Data.ByteString (ByteString)
 import           Data.Data (Data, Typeable)
 import           Data.Foldable (foldlM)
-import           Data.Monoid (mempty)
 import           System.FilePath ((</>))
 
 import           Control.Concurrent.STM
@@ -28,11 +25,6 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Digest.Pure.SHA (sha1, showDigest)
 import           Network.WebSockets (Request, WebSockets, Hybi00, Sink)
 import qualified Network.WebSockets as WS
-import qualified Network.WebSockets.Snap as WS
-import           Snap.Core (Snap)
-import qualified Snap.Core as Snap
-import qualified Snap.Http.Server as Snap
-import qualified Snap.Util.FileServe as Snap
 import           System.Random (randomRIO)
 
 import           Objects
@@ -179,7 +171,8 @@ spawnFlushCloud secs gchan = void . liftIO . forkIO $
     do threadDelay (secs * 1000000); atomically $ writeTChan gchan Timeout
 
 runGroup :: TVar ServerState -> Group -> GroupState -> GroupChan -> IO ()
-runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupStory = story} gs gchan =
+runGroup serverStateVar
+         group@Group{groupCloud = cloud@(Cloud votes _), groupStory = story} gs gchan =
     do gcmd <- atomically $ readTChan gchan
        case gcmd of
            ClientCmdFwd uid mSink cmd ->
@@ -280,24 +273,16 @@ data Shutdown = Shutdown
 
 instance Exception Shutdown
 
-server :: TVar ServerState -> FilePath -> Snap ()
-server ssvar fp =
-    do req <- Snap.rqPathInfo <$> Snap.getRequest
-       if req == "ws" then WS.runWebSocketsSnap (preJoin ssvar)
-           else Snap.serveDirectory fp
-
 -- | Start the WordWang server on the given host and port, return immediately,
 --   and return an action that shuts down the server.
-serve :: ByteString -> Int -> FilePath -> IO (IO ())
-serve host port fp =
+serve :: String -> Int -> IO (IO ())
+serve host port =
     do initialStories <- loadStories
        serverState <- newTVarIO ServerState{ serverGroups  = Map.empty
                                            , serverCounter = 0
                                            , closedStories = initialStories }
-       let config :: Snap.Config Snap () = Snap.setHostname host
-                                           (Snap.setPort port mempty)
        tid <- forkIO $ CE.handle (\(_ :: Shutdown) -> return ())
-                                 (Snap.simpleHttpServe config (server serverState fp))
+                                 (WS.runServer host port (preJoin serverState))
        return $ do CE.throwTo tid Shutdown
                    ServerState{closedStories = stories} <-
                        atomically (readTVar serverState)
