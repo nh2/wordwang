@@ -73,7 +73,7 @@ class @UI
       sug.block() == block
     if s?
       log "Upvoting id #{s.id}"
-      @server 'upvote', s.id
+      @server 'upvote', s.id()
     else
       log "Sending block #{block}"
       @server 'send',
