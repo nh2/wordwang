@@ -71,7 +71,7 @@ class @UI
   # Directly add suggestion to the UI
   addSuggestion: (block, votes=0, blockId=-1) =>
     s = new window.Suggestion(block, votes, blockId)
-    log "displaying suggestion", s
+    log 'displaying suggestion', '"'+s.block()+'"', 'with', s.votes(), 'votes'
     @suggestions.push s
     @sortSuggestions()
 
