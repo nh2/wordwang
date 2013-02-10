@@ -24,7 +24,7 @@ class @UI
     paragraph = []
     for block, index in @story()
       paragraph.push block
-      if index % 5 == 4 and block[block.length - 1] == '.'
+      if index % 5 == 4 and block[block.length - 1] in ['.', '?', '!']
         paragraphs.push paragraph
         paragraph = []
     if paragraph.length > 0
