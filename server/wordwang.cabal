@@ -37,6 +37,9 @@ Executable wordwang
                         unix,
                         SHA,
                         hashable,
-                        random
+                        random,
+                        snap-server,
+                        snap-core,
+                        websockets-snap
   Ghc-options:          -Wall
   Main-is:              wordwang.hs

@@ -1,8 +1,10 @@
+{-# LANGUAGE OverloadedStrings #-}
 import Server
 
 import           Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import qualified Control.Exception as CE
-import           System.Posix.Signals ( Handler(..), installHandler, sigINT )
+
+import           System.Posix.Signals (Handler(..), installHandler, sigINT)
 
 main :: IO ()
 main =

@@ -7,7 +7,9 @@ import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Exception (Exception)
 import qualified Control.Exception as CE
 import           Control.Monad (forever, forM, forM_, void, unless, filterM)
+import           Data.ByteString (ByteString)
 import           Data.Data (Data, Typeable)
+import           Data.Monoid (mempty)
 import           System.Directory
                  (createDirectory, doesDirectoryExist, getDirectoryContents,
                   doesFileExist)
@@ -22,9 +24,13 @@ import           Text.Printf (printf)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Digest.Pure.SHA (sha1, showDigest)
-import           Network.WebSockets
-                 (Request, WebSockets, runServer, Hybi00, Sink, getSink)
+import           Network.WebSockets (Request, WebSockets, Hybi00, Sink)
 import qualified Network.WebSockets as WS
+import qualified Network.WebSockets.Snap as WS
+import           Snap.Core (Snap)
+import qualified Snap.Core as Snap
+import qualified Snap.Http.Server as Snap
+import qualified Snap.Util.FileServe as Snap
 import           System.Random (randomRIO)
 
 import           Objects
@@ -88,7 +94,7 @@ preJoin serverStateVar rq =
                liftIO $ print cmd
                uid <- makeId serverStateVar
                gchan <- getCreateGroup serverStateVar mGroupId
-               sink <- getSink
+               sink <- WS.getSink
                liftIO $ atomically $
                         writeTChan gchan (ClientCmdFwd uid (Just sink) cmd)
                runUser gchan uid
@@ -101,7 +107,7 @@ runUser gchan uid = forever $ do
     case cmd of
         Join _ ->
             fail "Expecting non-join cmd"
-        _ -> do liftIO $ printf "User %d got message\n" uid
+        _ -> do _ <- liftIO $ printf "User %d got message\n" uid
                 liftIO $ atomically $ writeTChan gchan (ClientCmdFwd uid Nothing cmd)
 
 makeId :: (MonadIO m) => TVar ServerState -> m Int
@@ -138,6 +144,10 @@ _TICK_DELAY = 5
 -- | Where are stories saved on disk?
 _STORY_DIR :: FilePath
 _STORY_DIR = "stories"
+
+-- | Where are the files to be served?
+_HTML_DIR :: FilePath
+_HTML_DIR = "html"
 
 -- | There's a 1 in _NEW_GROUP_P chance of creating a new group when a user joins without
 -- specifying one.
@@ -270,16 +280,23 @@ data Shutdown = Shutdown
 
 instance Exception Shutdown
 
+server :: TVar ServerState -> Snap ()
+server ssvar =
+    do Snap.path "ws" (WS.runWebSocketsSnap (preJoin ssvar))
+       Snap.serveDirectory _HTML_DIR
+
 -- | Start the WordWang server on the given host and port, return immediately,
 --   and return an action that shuts down the server.
-serve :: String -> Int -> IO (IO ())
+serve :: ByteString -> Int -> IO (IO ())
 serve host port =
     do initialStories <- loadStories
        serverState <- newTVarIO ServerState{ serverGroups  = Map.empty
                                            , serverCounter = 0
                                            , closedStories = initialStories }
+       let config :: Snap.Config Snap () = Snap.setHostname host
+                                           (Snap.setPort port mempty)
        tid <- forkIO $ CE.handle (\(_ :: Shutdown) -> return ())
-                                 (runServer host port (preJoin serverState))
+                                 (Snap.simpleHttpServe config (server serverState))
        return $ do CE.throwTo tid Shutdown
                    ServerState{closedStories = stories} <-
                        atomically (readTVar serverState)
