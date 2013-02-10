@@ -174,6 +174,7 @@ createGroup serverStateVar gid = liftIO $
                              (GroupState {groupSinks = Map.empty, groupCounter = 0})
                              groupChan
                    `CE.finally` do _ <- printf "\n######## GROUP %d DIED ########\n\n" gid
+                                   -- You should NEVER see the above message.
                                    return ())
        return groupChan
 
