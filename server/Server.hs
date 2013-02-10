@@ -38,8 +38,8 @@ data ServerState = ServerState
 
 type GroupChan = TChan GroupCmd
 data GroupState = GroupState
-    { groupSinks :: Map UserId (Sink WebSocketProtocol)
-    , groupCount :: Int
+    { groupSinks   :: Map UserId (Sink WebSocketProtocol)
+    , groupCounter :: Int       -- ^ used to generate ids unique to the group
     }
 
 type WebSocketProtocol = Hybi00
@@ -53,7 +53,7 @@ insertSink User{userId = uid} sink gs@GroupState{groupSinks = sinks} =
     gs{groupSinks = Map.insert uid sink sinks}
 
 incCount :: GroupState -> (GroupState, Int)
-incCount gs@GroupState{groupCount = i} = (gs{groupCount = i + 1}, i)
+incCount gs@GroupState{groupCounter = i} = (gs{groupCounter = i + 1}, i)
 
 -- dummyGroup :: Group
 -- dummyGroup = Group { groupId    = 2
@@ -160,7 +160,7 @@ createGroup serverStateVar gid = liftIO $
        spawnFlushCloud _TICK_DELAY groupChan
        _ <- forkIO (runGroup serverStateVar
                              group
-                             (GroupState {groupSinks = Map.empty, groupCount = 0})
+                             (GroupState {groupSinks = Map.empty, groupCounter = 0})
                              groupChan
                    `CE.finally` do _ <- printf "\n######## GROUP %d DIED ########\n\n" gid
                                    return ())
