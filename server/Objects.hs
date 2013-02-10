@@ -5,6 +5,7 @@ module Objects where
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad (mzero)
 import           Data.Maybe (fromJust)
+import           Data.Ord (comparing)
 import           Data.String (IsString(..))
 import           GHC.Generics (Generic)
 
@@ -81,11 +82,8 @@ data CloudItem = CloudItem
     } deriving (Eq, Show, Generic)
 
 instance Ord CloudItem where
-    -- | 'CloseBlock's have the highest priority.  Otherwise, blocks are sorted by the
-    -- number of votes.
-    CloudItem{cloudBlock = Block{content = CloseBlock}} `compare` _ = GT
-    _ `compare` CloudItem{cloudBlock = Block{content = CloseBlock}} = LT
-    a `compare` b = compare (Set.size (cloudUids a)) (Set.size (cloudUids b))
+    -- | More votes == greater 'CloudItem'
+    compare = comparing (Set.size . cloudUids)
 
 instance FromJSON CloudItem
 instance ToJSON CloudItem
