@@ -180,18 +180,18 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                        do let user   = User uid uname
                               group' = insertUser user group
                               gs'    = insertSink user sink gs
-                          broadcastRefresh group gs' >>= rec group'
+                          broadcastRefresh group' gs' >>= uncurry rec
                    (Nothing, Send blockContent) ->
                        do let (gs', bid) = incCount gs
                               block = Block bid blockContent
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
-                          broadcastRefresh group' gs' >>= rec group'
+                          broadcastRefresh group' gs' >>= uncurry rec
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
                            Just cloud' ->
                                do let group' = group {groupCloud = cloud'}
-                                  broadcastRefresh group' gs >>= rec group'
+                                  broadcastRefresh group' gs >>= uncurry rec
                            Nothing ->
                                do putStrLn "Upvote for nonexisting message, ignoring"
                                   rec group gs
@@ -207,7 +207,7 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                    Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
-                                broadcastCmd (Refresh group') gs >>= rec group'
+                                broadcastCmd (Refresh group') group' gs >>= uncurry rec
   where
     rec group' gs' = runGroup serverStateVar group' gs' gchan
     maxBlock [] = Nothing
@@ -225,20 +225,23 @@ closeStory ssvar group gs gchan story =
                     _ <- atomically $ readTChan gchan
                     broadcastRefresh group gs
 
-broadcastCmd :: ServerCmd -> GroupState -> IO GroupState
-broadcastCmd cmd gs@GroupState{groupSinks = sinks} =
-    do putStrLn (show cmd)
-       foldlM sendSink' gs (Map.toList sinks)
+broadcastCmd :: ServerCmd -> Group -> GroupState -> IO (Group, GroupState)
+broadcastCmd cmd group gs@GroupState{groupSinks = sinks} =
+    do _ <- printf "sending %s\n\n" (show cmd)
+       foldlM sendSink' (group, gs) (Map.toList sinks)
   where
-    sendSink' gs0@GroupState{groupSinks = sinks'} (uid, sink) =
+    sendSink' ( grp0@Group{groupUsers = users}
+              , gs0@GroupState{groupSinks = sinks'})
+              (uid, sink) =
         do CE.handle (\(_ :: CE.SomeException) ->
                        do _ <- putStrLn "There's a dead sink.  Removing it."
-                          return (gs0{groupSinks = Map.delete uid sinks'})) $
+                          return ( grp0{groupUsers = Map.delete uid users}
+                                 , gs0{groupSinks = Map.delete uid sinks'} )) $
                do WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
-                  return gs0
+                  return (grp0, gs0)
 
-broadcastRefresh :: Group -> GroupState -> IO GroupState
-broadcastRefresh g = broadcastCmd (Refresh g)
+broadcastRefresh :: Group -> GroupState -> IO (Group, GroupState)
+broadcastRefresh g = broadcastCmd (Refresh g) g
 
 -- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
 saveStories :: (MonadIO m) => [Story] -> m ()
