@@ -6,7 +6,7 @@ class @Suggestion
 
   minFont: .6
   maxFont: =>
-    .9 + window.ui.suggestions.length*0.05
+    .9 + window.ui.suggestions.length*0.15
 
   calcFontSize: =>
     dV = window.ui.maxSuggestionVotes() - window.ui.minSuggestionVotes()
