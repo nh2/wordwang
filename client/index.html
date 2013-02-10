@@ -18,8 +18,6 @@
     <script type="text/coffeescript" src="js/suggestion.coffee"></script>
     <script type="text/coffeescript" src="js/fixtures.coffee"></script>
 
-    <script type="text/javascript" src="http://localhost:8001/vogue-client.js"></script>
-
   </head>
 
   <body>
@@ -38,28 +36,30 @@
         </div>
       </div>
       <div data-bind="if: joined">
-        <div id="story-container">
-          <div class="read-more"></div>
-          <div data-bind="foreach: storyParagraphs">
-            <p data-bind="foreach: $data">
-              <span data-bind="text: $data"></span>
-            </p>
+        <div id="main">
+          <div id="story-container">
+            <div class="read-more"></div>
+            <div data-bind="foreach: storyParagraphs">
+              <p data-bind="foreach: $data">
+                <span data-bind="text: $data"></span>
+              </p>
+            </div>
           </div>
-        </div>
-        <div class="story_input">
-          <div id="next">
-            <ul class="suggestions" data-bind="foreach: $root.suggestions">
-              <li class="suggestion" data-bind="click: function() { $root.suggest($data.block()); }, style: { fontSize: $data.calcFontSize() }">
-                <span class="block" data-bind="text: $data.block"></span>
-                <span class="votes" data-bind="text: $data.votes"></span>
-              </li>
-            </ul>
-            <ul class="suggestions suggestionsShown"></ul>
-          </div>
-          <div id="enter">
-            <form data-bind="submit: function() { suggestCurrent(); return false }">
-              <input type="text" id="next-box" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />
-            </form>
+          <div class="story_input">
+            <div id="next">
+              <ul class="suggestions" data-bind="foreach: $root.suggestions">
+                <li class="suggestion" data-bind="click: function() { $root.suggest($data.block()); }, style: { fontSize: $data.calcFontSize() }">
+                  <span class="block" data-bind="text: $data.block"></span>
+                  <span class="votes" data-bind="text: $data.votes"></span>
+                </li>
+              </ul>
+              <ul class="suggestions suggestionsShown"></ul>
+            </div>
+            <div id="enter">
+              <form data-bind="submit: function() { suggestCurrent(); return false }">
+                <input type="text" id="next-box" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />
+              </form>
+            </div>
           </div>
         </div>
       </div>

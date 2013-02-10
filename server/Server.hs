@@ -74,17 +74,23 @@ incCount gs@GroupState{groupCounter = i} = (gs{groupCounter = i + 1}, i)
 --                                 , (4, CloudItem block4 (Set.fromList [8, 12]))
 --                                 ])
 
-receiveClientCmd :: WebSockets WebSocketProtocol ClientCmd
+receiveClientCmd :: WebSockets WebSocketProtocol (Maybe ClientCmd)
 receiveClientCmd =
-    do msg <- WS.receiveData
-       maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' msg)
+    do msg <- WS.receive
+       case msg of
+           WS.ControlMessage _ ->
+               return Nothing
+           WS.DataMessage (WS.Text t) ->
+               Just <$> maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' t)
+           WS.DataMessage (WS.Binary b) ->
+               Just <$> maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' b)
 
 preJoin :: TVar ServerState -> Request -> WebSockets WebSocketProtocol ()
 preJoin serverStateVar rq =
     do WS.acceptRequest rq
-       cmd <- receiveClientCmd
-       case cmd of
-           Join (JoinPayload _ mGroupId) -> do
+       mcmd <- receiveClientCmd
+       case mcmd of
+           Just cmd@(Join (JoinPayload _ mGroupId)) -> do
                liftIO $ print cmd
                uid <- makeId serverStateVar
                gchan <- getCreateGroup serverStateVar mGroupId
@@ -97,12 +103,14 @@ preJoin serverStateVar rq =
 runUser :: GroupChan -> UserId -> WebSockets WebSocketProtocol ()
 runUser gchan uid = forever $ do
     _ <- liftIO $ printf "Waiting for msg for user %d\n" uid
-    cmd <- receiveClientCmd
-    case cmd of
-        Join _ ->
+    mcmd <- receiveClientCmd
+    case mcmd of
+        Just (Join _) ->
             fail "Expecting non-join cmd"
-        _ -> do _ <- liftIO $ printf "User %d got message\n" uid
-                liftIO $ atomically $ writeTChan gchan (ClientCmdFwd uid Nothing cmd)
+        Just cmd -> do _ <- liftIO $ printf "User %d got message\n" uid
+                       liftIO $ atomically $ writeTChan gchan (ClientCmdFwd uid Nothing cmd)
+        Nothing ->
+            liftIO $ putStrLn "User got a control message"
 
 makeId :: (MonadIO m) => TVar ServerState -> m Int
 makeId serverStateVar = liftIO $ atomically $
@@ -181,6 +189,9 @@ runGroup serverStateVar
                        do let user   = User uid uname
                               group' = insertUser user group
                               gs'    = insertSink user sink gs
+                          WS.sendSink sink (WS.DataMessage
+                                            (WS.Text (Aeson.encode (Refresh group' LoggedIn))))
+                              `CE.catch` (\(_ :: CE.SomeException) -> return ())
                           broadcastRefresh group' NewJoin gs' >>= uncurry rec
                    (Nothing, Send blockContent) ->
                        do let (gs', bid) = incCount gs
@@ -238,7 +249,8 @@ broadcastCmd cmd group gs@GroupState{groupSinks = sinks} =
                        do _ <- putStrLn "There's a dead sink.  Removing it."
                           return ( grp0{groupUsers = Map.delete uid users}
                                  , gs0{groupSinks = Map.delete uid sinks'} )) $
-               do WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
+               do putStrLn "Sending message to some sink"
+                  WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
                   return (grp0, gs0)
 
 broadcastRefresh :: Group -> ServerCmdReason -> GroupState -> IO (Group, GroupState)

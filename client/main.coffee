@@ -5,8 +5,8 @@
     throw n
 
 
-WS_URL = "ws://localhost:8888/"
 UPDATE_TIME = 5000
+WS_URL = "ws://"+window.location.host+"/ws"
 
 class @UI
   constructor: ->
@@ -41,21 +41,25 @@ class @UI
     @story []
     @suggestions []
 
+    group = refresh_info.group
+
     # Assemble story
-    for entry in refresh_info.groupStory
+    for entry in group.groupStory
       { blockType, blockContent } = entry.content
       if blockType == 'string'
         @story.push blockContent
       else
         log "WARNING: Ingoring story entry of unknown content:", entry
 
-    for id, entry of refresh_info.groupCloud
+    for id, entry of group.groupCloud
       votes = entry.cloudUids.length
       { blockId, content } = entry.cloudBlock
       if content.blockType == 'string'
         @addSuggestion(content.blockContent, votes, blockId)
       else
         log "WARNING: Unhandled cloud content type:", content
+
+    @newBlock() if refresh_info.reason == "storyUpdate"
 
     @sortSuggestions()
 
