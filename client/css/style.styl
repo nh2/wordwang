@@ -61,12 +61,15 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
       input[type=submit]
         width: 5em
 
-
-
 #story-container
   font-family: 'Libre Baskerville'
   font-size: 14pt
   line-height: normal
+
+  p:first-letter {
+    font-size: 2.5em
+    text-transform: capitalize
+  }
 
 #middle
   margin: 0 auto
@@ -135,3 +138,12 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
 #next-box
   background-image: url('/img/progress_overlay.png')
   background-repeat: no-repeat
+
+#group-label
+  position: fixed
+  top: 2px
+  right: 4px
+  color: #ccc
+
+body
+  padding: 3em

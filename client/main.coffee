@@ -11,6 +11,7 @@ WS_URL = "ws://#{window.location.hostname}:8888/ws"
 class @UI
   constructor: ->
     @joined = ko.observable false
+    @groupId = ko.observable null
     @story = ko.observableArray []
     @storyParagraphs = ko.computed @paragraphs
     @suggestion = ko.observable ''
@@ -25,7 +26,7 @@ class @UI
     paragraph = []
     for block, index in @story()
       paragraph.push block
-      if index % 5 == 4 and block[block.length - 1] == '.'
+      if index % 5 == 4 and block[block.length - 1] in ['.', '?', '!']
         paragraphs.push paragraph
         paragraph = []
     if paragraph.length > 0
@@ -37,7 +38,6 @@ class @UI
     @suggestion ''
 
   refresh: (refresh_info) =>
-    @joined true
     window.refresh_info = refresh_info
 
     # Reset all observables until we have a finer grained method
@@ -45,6 +45,11 @@ class @UI
     @suggestions []
 
     group = refresh_info.group
+
+    if refresh_info.reason == 'loggedIn'
+      log "loggedIn"
+      @joined true
+      @groupId group.groupId
 
     # Assemble story
     for entry in group.groupStory
@@ -80,7 +85,7 @@ class @UI
     s = _.find @suggestions(), (sug) =>
       sug.block() == block
     if s?
-      log "Upvoting id #{s.id}"
+      log "Upvoting id #{s.id()}"
       @server 'upvote', s.id()
     else
       log "Sending block #{block}"
@@ -115,8 +120,10 @@ class @UI
     sug.votes()
 
   joinGroup: =>
+    groupIdMatch = window.location.hash.match(/#(\d+)/)
+    groupId = if groupIdMatch then parseInt(groupIdMatch[1]) else null
     @server 'join',
-      joinGroupId: null
+      joinGroupId: groupId
       joinUserName: @username()
 
   server: (cmd, args) =>
