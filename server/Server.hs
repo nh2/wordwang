@@ -25,6 +25,7 @@ import           Data.Digest.Pure.SHA (sha1, showDigest)
 import           Network.WebSockets
                  (Request, WebSockets, runServer, Hybi00, Sink, getSink)
 import qualified Network.WebSockets as WS
+import           System.Random (randomRIO)
 
 import           Objects
 
@@ -109,7 +110,17 @@ makeId serverStateVar = liftIO $ atomically $
 
 getCreateGroup :: (MonadIO m) => TVar ServerState -> Maybe GroupId -> m GroupChan
 getCreateGroup serverStateVar Nothing = liftIO $
-    do gid <- makeId serverStateVar; createGroup serverStateVar gid
+    do ServerState {serverGroups = gs} <- atomically $ readTVar serverStateVar
+       nc <- randomRIO (0, 10 :: Int)
+       -- Create a new group if there are no existing ones, or if d10 comes out 0.
+       if Map.null gs || nc == 0
+           then do putStrLn "Creating a new group"
+                   gid <- makeId serverStateVar
+                   createGroup serverStateVar gid
+           else do _ <- printf "Looking up an existing group (out of %d groups)\n" (Map.size gs)
+                   let gchans = map snd (Map.toList gs)
+                   i <- randomRIO (0, Map.size gs - 1)
+                   return (gchans !! i)
 getCreateGroup serverStateVar (Just gid) = liftIO $
     do mgchan <- atomically $
                  do ServerState {serverGroups = gs} <- readTVar serverStateVar
@@ -199,8 +210,10 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
 closeStory :: TVar ServerState -> Group -> GroupState -> GroupChan -> Story -> IO ()
 closeStory ssvar group gs gchan story =
     do putStrLn "Closed story"
-       atomically $ do sstate@ServerState{closedStories = fss} <- readTVar ssvar
-                       writeTVar ssvar sstate{closedStories = story : fss}
+       atomically $ do sstate@ServerState{ closedStories = fss
+                                         , serverGroups = grps } <- readTVar ssvar
+                       writeTVar ssvar sstate{ closedStories = story : fss
+                                             , serverGroups = Map.delete (groupId group) grps }
        -- This group is now closed, so drop all messages sent to it.
        forever $ do liftIO $ putStrLn "Dropping message"
                     _ <- atomically $ readTChan gchan

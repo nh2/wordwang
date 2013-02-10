@@ -36,7 +36,7 @@ Executable wordwang
                         ansi-terminal,
                         unix,
                         SHA,
-                        hashable
-
+                        hashable,
+                        random
   Ghc-options:          -Wall
   Main-is:              wordwang.hs
