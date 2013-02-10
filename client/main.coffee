@@ -85,6 +85,10 @@ class @UI
     sug.votes newv
     @sortSuggestions()
 
+  minSuggestionVotes: =>
+    sug = _.min @suggestions(), (sug) -> sug.votes()
+    sug.votes()
+
   maxSuggestionVotes: =>
     sug = _.max @suggestions(), (sug) -> sug.votes()
     sug.votes()

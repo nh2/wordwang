@@ -4,10 +4,11 @@ class @Suggestion
     @block = ko.observable block
     @votes = ko.observable votes
 
-  minFont: 12
-  maxFont: 25
+  minFont: .6
+  maxFont: 2.3
 
   calcFontSize: =>
-    size = @maxFont - (window.ui.maxSuggestionVotes() - @votes())
-    size = if size < @minFont then @minFont else size
-    size + "px"
+    dV = window.ui.maxSuggestionVotes() - window.ui.minSuggestionVotes()
+    dF = @maxFont - @minFont
+    size = dF / dV * @votes() + @minFont
+    size + "em"
