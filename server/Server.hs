@@ -160,34 +160,37 @@ runGroup serverStateVar group@Group{groupCloud = cloud, groupStory = story} gs g
                               group' = insertUser user group
                               gs'    = insertSink user sink gs
                           broadcastCmd (Refresh group) (insertSink user sink gs)
-                          runGroup serverStateVar group' gs' gchan
+                          rec group' gs'
                    (Nothing, Send blockContent) ->
                        do let (gs', bid) = incCount gs
                               block = Block bid blockContent
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
                           broadcastCmd (Refresh group') gs'
-                          runGroup serverStateVar group' gs' gchan
+                          rec group' gs'
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
                            Just cloud' ->
                                do let group' = group {groupCloud = cloud'}
                                   broadcastCmd (Refresh group') gs
-                                  runGroup serverStateVar group' gs gchan
-                           Nothing -> undefined
-                   _ -> do liftIO (print (uid, cmd))
-                           runGroup serverStateVar group gs gchan
+                                  rec group' gs
+                           Nothing ->
+                               do putStrLn "Upvote for nonexisting message, ignoring"
+                                  rec group gs
+                   _ -> do putStrLn ("Malformed message: " ++ show (uid, cmd))
+                           rec group gs
            Timeout ->
                case bestBlock cloud of
                    Nothing -> do spawnFlushCloud _TICK_DELAY gchan
-                                 runGroup serverStateVar group gs gchan
+                                 rec group gs
                    Just Block{content = CloseBlock} ->
                        closeStory serverStateVar group gs gchan story
                    Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
                                 broadcastCmd (Refresh group') gs
-                                runGroup serverStateVar group' gs gchan
+                                rec group' gs
+  where rec group' gs' = runGroup serverStateVar group' gs' gchan
 
 closeStory :: TVar ServerState -> Group -> GroupState -> GroupChan -> Story -> IO ()
 closeStory ssvar group gs gchan story =
