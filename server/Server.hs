@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server where
 
+import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Exception (Exception)
 import qualified Control.Exception as CE
@@ -173,6 +174,7 @@ createGroup serverStateVar gid = liftIO $
                              (GroupState {groupSinks = Map.empty, groupCounter = 0})
                              groupChan
                    `CE.finally` do _ <- printf "\n######## GROUP %d DIED ########\n\n" gid
+                                   -- You should NEVER see the above message.
                                    return ())
        return groupChan
 
@@ -190,18 +192,18 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                        do let user   = User uid uname
                               group' = insertUser user group
                               gs'    = insertSink user sink gs
-                          broadcastRefresh group' gs' >>= uncurry rec
+                          broadcastRefresh group' NewJoin gs' >>= uncurry rec
                    (Nothing, Send blockContent) ->
                        do let (gs', bid) = incCount gs
                               block = Block bid blockContent
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
-                          broadcastRefresh group' gs' >>= uncurry rec
+                          broadcastRefresh group' CloudUpdate gs' >>= uncurry rec
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
                            Just cloud' ->
                                do let group' = group {groupCloud = cloud'}
-                                  broadcastRefresh group' gs >>= uncurry rec
+                                  broadcastRefresh group' CloudUpdate gs >>= uncurry rec
                            Nothing ->
                                do putStrLn "Upvote for nonexisting message, ignoring"
                                   rec group gs
@@ -217,7 +219,7 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                    Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
-                                broadcastCmd (Refresh group') group' gs >>= uncurry rec
+                                broadcastRefresh group' StoryUpdate gs >>= uncurry rec
   where
     rec group' gs' = runGroup serverStateVar group' gs' gchan
     maxBlock [] = Nothing
@@ -233,7 +235,7 @@ closeStory ssvar group gs gchan story =
        -- This group is now closed, so drop all messages sent to it.
        forever $ do liftIO $ putStrLn "Dropping message"
                     _ <- atomically $ readTChan gchan
-                    broadcastRefresh group gs
+                    broadcastRefresh group NoChanges gs
 
 broadcastCmd :: ServerCmd -> Group -> GroupState -> IO (Group, GroupState)
 broadcastCmd cmd group gs@GroupState{groupSinks = sinks} =
@@ -250,8 +252,8 @@ broadcastCmd cmd group gs@GroupState{groupSinks = sinks} =
                do WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
                   return (grp0, gs0)
 
-broadcastRefresh :: Group -> GroupState -> IO (Group, GroupState)
-broadcastRefresh g = broadcastCmd (Refresh g) g
+broadcastRefresh :: Group -> ServerCmdReason -> GroupState -> IO (Group, GroupState)
+broadcastRefresh g reason = broadcastCmd (Refresh g reason) g
 
 -- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
 saveStories :: (MonadIO m) => [Story] -> m ()
@@ -284,8 +286,9 @@ instance Exception Shutdown
 
 server :: TVar ServerState -> Snap ()
 server ssvar =
-    do Snap.path "ws" (WS.runWebSocketsSnap (preJoin ssvar))
-       Snap.serveDirectory _HTML_DIR
+    do req <- Snap.rqPathInfo <$> Snap.getRequest
+       if req == "ws" then WS.runWebSocketsSnap (preJoin ssvar)
+           else Snap.serveDirectory _HTML_DIR
 
 -- | Start the WordWang server on the given host and port, return immediately,
 --   and return an action that shuts down the server.

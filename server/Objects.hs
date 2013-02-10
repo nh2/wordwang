@@ -185,21 +185,37 @@ instance FromJSON ClientCmd where
 -- | Messages sent by the server to the client
 --
 -- @
--- { "args": { "groupStory": []
---           , "groupCloud": {"3":[{"blockId":3,"content":"hello"},[5]]}
---           , "groupUsers": {"5":{"userId":5,"userName":"francesco"}}
---           , "groupId":7
+-- { "args": { "reason": "newJoin"
+--           , { "groupStory": []
+--             , "groupCloud": {"3":[{"blockId":3,"content":"hello"},[5]]}
+--             , "groupUsers": {"5":{"userId":5,"userName":"francesco"}}
+--             , "groupId":7
+--             }
 --           }
 -- , "cmd": "refresh"
 -- }
 -- @
-data ServerCmd = Refresh Group  -- ^ After any event change, the server sends
-                                --   back the 'Group' to all the partecipants to
-                                --   that they can update the page.
+data ServerCmd =
+    Refresh Group ServerCmdReason  -- ^ After any event change, the server sends
+                                   --   back the 'Group' to all the partecipants to
+                                   --   that they can update the page.
     deriving (Eq, Show, Generic)
 
+data ServerCmdReason = NewJoin | CloudUpdate | StoryUpdate | NoChanges
+    deriving (Eq, Show, Generic)
+
+instance ToJSON ServerCmdReason where
+    toJSON NewJoin     = Aeson.String "newJoin"
+    toJSON CloudUpdate = Aeson.String "cloudUpdate"
+    toJSON StoryUpdate = Aeson.String "storyUpdate"
+    toJSON NoChanges   = Aeson.String "noChanges"
+
 instance ToJSON ServerCmd where
-    toJSON (Refresh group) = cmdJSON "refresh" group
+    toJSON (Refresh group reason) =
+        Aeson.object [("cmd", "refresh"),
+                      ("args", Aeson.object [ ("reason", toJSON reason)
+                                            , ("group",  toJSON group)
+                                            ])]
 
 -- Utils
 
