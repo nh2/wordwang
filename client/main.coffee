@@ -218,9 +218,17 @@ connectServer = (ui) ->
     else
       throw new Error('dispatcher error: ' + msg.cmd)
 
+
+startAutoScrolling = ->
+  setInterval(->
+    $("html, body").animate({ scrollTop: $(document).height() })
+  , 1000)
+
 main = ->
   window.ui = ui = new UI()
   ko.applyBindings(ui)
+
+  startAutoScrolling()
 
   connectServer ui
 
