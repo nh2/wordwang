@@ -111,7 +111,7 @@ makeId serverStateVar = liftIO $ atomically $
 getCreateGroup :: (MonadIO m) => TVar ServerState -> Maybe GroupId -> m GroupChan
 getCreateGroup serverStateVar Nothing = liftIO $
     do ServerState {serverGroups = gs} <- atomically $ readTVar serverStateVar
-       nc <- randomRIO (0, 10 :: Int)
+       nc <- randomRIO (0, _NEW_GROUP_P)
        -- Create a new group if there are no existing ones, or if d10 comes out 0.
        if Map.null gs || nc == 0
            then do putStrLn "Creating a new group"
@@ -129,13 +129,18 @@ getCreateGroup serverStateVar (Just gid) = liftIO $
            Just gchan -> return gchan
            Nothing    -> fail (printf "no such group %s" (show gid))
 
--- seconds
+-- | seconds
 _TICK_DELAY :: Int
 _TICK_DELAY = 5
 
--- Where are stories saved on disk?
+-- | Where are stories saved on disk?
 _STORY_DIR :: FilePath
 _STORY_DIR = "stories"
+
+-- | There's a 1 in _NEW_GROUP_P chance of creating a new group when a user joins without
+-- specifying one.
+_NEW_GROUP_P :: Int
+_NEW_GROUP_P = 10
 
 createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m GroupChan
 createGroup serverStateVar gid = liftIO $
