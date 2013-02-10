@@ -49,6 +49,7 @@ class @UI
     if refresh_info.reason == 'loggedIn'
       log "loggedIn"
       @joined true
+      $('#main').show()
       @groupId group.groupId
       window.location.hash = group.groupId
 

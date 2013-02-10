@@ -23,11 +23,6 @@
 
   <body>
     <div id="middle">
-
-      <div id="group-label">
-        <span data-bind="text: groupId">GROUP_ID</span>
-      </div>
-
       <div data-bind="ifnot: joined">
         <div id="login-container">
           <div id="login">
@@ -40,7 +35,10 @@
           </div>
         </div>
       </div>
-      <div data-bind="if: joined">
+      <div id="main" data-bind="if: joined">
+        <div id="group-label">
+          <span data-bind="text: groupId">GROUP_ID</span>
+        </div>
         <img src="img/flourish.svg" alt="Wordwang" id="flourish" />
         <div id="story-container">
           <div data-bind="foreach: storyParagraphs">
