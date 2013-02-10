@@ -148,6 +148,8 @@ class @UI
         ent.css ncss
         ent.addClass "h"+hash
         show.append ent
+        ent.click =>
+          $sug.click()
         setTimeout =>
           ent.css "opacity", 1
           , 0
