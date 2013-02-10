@@ -56,6 +56,8 @@ class @UI
       else
         log "WARNING: Unhandled cloud content type:", content
 
+    @sortSuggestions()
+
   # Sends suggestion to the server
   suggest: (block) =>
     s = _.findWhere(@suggestions, { block: block })
@@ -73,13 +75,14 @@ class @UI
     s = new window.Suggestion(block, votes, blockId)
     log 'displaying suggestion', '"'+s.block()+'"', 'with', s.votes(), 'votes'
     @suggestions.push s
-    @sortSuggestions()
+    # @sortSuggestions()
 
   sortSuggestions: =>
-    if @suggestions().length == 0
-      return clearSuggestions
-    @suggestions.sort (a,b) -> b.votes() - a.votes()
-    setTimeout @rearrangeSuggestions, 0
+    if @suggestions().length is 0
+      @clearSuggestions()
+    else
+      @suggestions.sort (a,b) -> b.votes() - a.votes()
+      setTimeout @rearrangeSuggestions, 0
 
   setSuggestionVotes: (sug, newv) =>
     sug.votes newv

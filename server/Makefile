@@ -13,7 +13,7 @@ install: build
 
 clean:
 	cabal-dev clean
-	rm -rf cabal-dev/
+	rm -rf cabal-dev/ log/
 
 dist/setup-config: wordwang.cabal
 # If you don't have all the necessary packages installed on the first
@@ -29,6 +29,7 @@ p:
 	             Makefile
 
 run: build
+	mkdir -p log/
 	dist/build/wordwang/wordwang
 
 ghci: build
