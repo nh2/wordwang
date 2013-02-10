@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server where
 
+import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Exception (Exception)
 import qualified Control.Exception as CE
@@ -284,8 +285,9 @@ instance Exception Shutdown
 
 server :: TVar ServerState -> Snap ()
 server ssvar =
-    do Snap.path "ws" (WS.runWebSocketsSnap (preJoin ssvar))
-       Snap.serveDirectory _HTML_DIR
+    do req <- Snap.rqPathInfo <$> Snap.getRequest
+       if req == "ws" then WS.runWebSocketsSnap (preJoin ssvar)
+           else Snap.serveDirectory _HTML_DIR
 
 -- | Start the WordWang server on the given host and port, return immediately,
 --   and return an action that shuts down the server.
