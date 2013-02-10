@@ -138,7 +138,7 @@ getCreateGroup serverStateVar (Just gid) = liftIO $
                     return (Map.lookup gid gs)
        case mgchan of
            Just gchan -> return gchan
-           Nothing    -> fail (printf "no such group %s" (show gid))
+           Nothing    -> createGroup serverStateVar gid
 
 -- | seconds
 _TICK_DELAY :: Int
@@ -164,7 +164,8 @@ createGroup serverStateVar gid = liftIO $
        atomically $
            do serverState@ServerState {serverGroups = gs} <- readTVar serverStateVar
               writeTVar serverStateVar
-                        (serverState { serverGroups = Map.insert gid groupChan gs })
+                        (serverState { serverGroups = Map.insert gid groupChan gs
+                                     , serverCounter = max (gid + 1) (serverCounter serverState)})
        _ <- forkIO (runGroup serverStateVar
                              group
                              (GroupState {groupSinks = Map.empty, groupCounter = 0})
