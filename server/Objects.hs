@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
 module Objects where
 
 import           Control.Applicative ((<$>), (<*>))
@@ -76,11 +75,10 @@ data Cloud = Cloud (Map BlockId CloudItem)
 instance ToJSON Cloud where
     toJSON (Cloud votes _) = toJSON votes
 
-data CloudItem
-    = CloudItem { cloudBlock :: Block
-                , cloudUids :: Set UserId
-                }
-      deriving (Eq, Show, Generic)
+data CloudItem = CloudItem
+    { cloudBlock :: Block
+    , cloudUids :: Set UserId
+    } deriving (Eq, Show, Generic)
 
 instance Ord CloudItem where
     -- | 'CloseBlock's have the highest priority.  Otherwise, blocks are sorted by the
@@ -109,7 +107,7 @@ upvoteBlock bid uid (Cloud votes hs) =
     case Map.lookup bid votes of
         Nothing -> Nothing
         Just (CloudItem b voters) ->
-            Just (Cloud (Map.insert bid (CloudItem b $ Set.insert uid voters) votes) hs)
+            Just (Cloud (Map.insert bid (CloudItem b (Set.insert uid voters)) votes) hs)
 
 -- | @{"userId": 5, "userName": "francesco"}@
 data User = User
@@ -139,6 +137,10 @@ data Group = Group
     } deriving (Eq, Show, Generic)
 type GroupId = Id
 type Story = [Block]
+
+insertUser :: User -> Group -> Group
+insertUser u@User{userId = uid} g@Group{groupUsers = users} =
+    g{groupUsers = Map.insert uid u users}
 
 instance ToJSON Group
 
@@ -200,13 +202,6 @@ data ServerCmd = Refresh Group  -- ^ After any event change, the server sends
 
 instance ToJSON ServerCmd where
     toJSON (Refresh group) = cmdJSON "refresh" group
-
--- instance FromJSON ServerCmd where
---     parseJSON js =
---         do (name, args)  <- jsonCmd js
---            case name of
---                "refresh" -> Refresh <$> parseJSON args
---                _         -> mzero
 
 -- Utils
 

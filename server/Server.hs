@@ -1,34 +1,37 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Server where
 
 import           Control.Concurrent (forkIO, threadDelay)
+import           Control.Exception (Exception)
 import qualified Control.Exception as CE
-import qualified Data.ByteString.Lazy.Char8 as BL
-import           Data.Data (Data, Typeable)
-import           Data.Digest.Pure.SHA (sha1, showDigest)
-import           Control.Exception ( Exception )
 import           Control.Monad (forever, forM, forM_, void, unless, filterM)
-import           Control.Monad.Trans (MonadIO(..))
+import           Data.Data (Data, Typeable)
+import           System.Directory
+                 (createDirectory, doesDirectoryExist, getDirectoryContents,
+                  doesFileExist)
+import           System.FilePath ((</>))
 
 import           Control.Concurrent.STM
+import           Control.Monad.Trans (MonadIO(..))
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Text.Printf (printf)
 
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy.Char8 as BL
+import           Data.Digest.Pure.SHA (sha1, showDigest)
 import           Network.WebSockets
                  (Request, WebSockets, runServer, Hybi00, Sink, getSink)
 import qualified Network.WebSockets as WS
-import           System.Directory ( createDirectory, doesDirectoryExist
-                                  , getDirectoryContents, doesFileExist )
-import           System.FilePath ( (</>) )
 
 import           Objects
 
 data ServerState = ServerState
     { serverGroups    :: Map GroupId GroupChan
     , serverCounter   :: Int
-    , finishedStories :: [Story]
+    , closedStories :: [Story]
     }
 
 type GroupChan = TChan GroupCmd
@@ -42,6 +45,13 @@ type WebSocketProtocol = Hybi00
 data GroupCmd
     = ClientCmdFwd UserId (Maybe (Sink WebSocketProtocol)) ClientCmd
     | Timeout
+
+insertSink :: User -> Sink WebSocketProtocol -> GroupState -> GroupState
+insertSink User{userId = uid} sink gs@GroupState{groupSinks = sinks} =
+    gs{groupSinks = Map.insert uid sink sinks}
+
+incCount :: GroupState -> (GroupState, Int)
+incCount gs@GroupState{groupCount = i} = (gs{groupCount = i + 1}, i)
 
 -- dummyGroup :: Group
 -- dummyGroup = Group { groupId    = 2
@@ -140,62 +150,61 @@ spawnFlushCloud secs gchan = void . liftIO . forkIO $
     do threadDelay (secs * 1000000); atomically $ writeTChan gchan Timeout
 
 runGroup :: TVar ServerState -> Group -> GroupState -> GroupChan -> IO ()
-runGroup serverStateVar
-         group@Group{ groupUsers = gusers
-                    , groupCloud = cloud@(Cloud votes _)
-                    , groupStory = story }
-         gs@GroupState{ groupSinks = sinks
-                      , groupCount = count }
-         gchan =
+runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupStory = story} gs gchan =
     do gcmd <- atomically $ readTChan gchan
        case gcmd of
            ClientCmdFwd uid mSink cmd ->
                case (mSink, cmd) of
                    (Just sink, Join (JoinPayload uname _)) ->
-                       do let gs' = gs {groupSinks = Map.insert uid sink sinks}
-                              group' = group { groupUsers = Map.insert uid
-                                                            (User uid uname) gusers }
-                          broadcastCmd (Refresh group') gs'
-                          runGroup serverStateVar group' gs' gchan
+                       do let user   = User uid uname
+                              group' = insertUser user group
+                              gs'    = insertSink user sink gs
+                          broadcastRefresh group (insertSink user sink gs)
+                          rec group' gs'
                    (Nothing, Send blockContent) ->
-                       do let bid = count
-                              gs' = gs {groupCount = count + 1}
+                       do let (gs', bid) = incCount gs
                               block = Block bid blockContent
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
-                          broadcastCmd (Refresh group') gs'
-                          runGroup serverStateVar group' gs' gchan
+                          broadcastRefresh group' gs'
+                          rec group' gs'
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
                            Just cloud' ->
                                do let group' = group {groupCloud = cloud'}
-                                  broadcastCmd (Refresh group') gs
-                                  runGroup serverStateVar group' gs gchan
-                           Nothing -> undefined
+                                  broadcastRefresh group' gs
+                                  rec group' gs
+                           Nothing ->
+                               do putStrLn "Upvote for nonexisting message, ignoring"
+                                  rec group gs
                    _ -> do _ <- printf "got an unexpected command: %s\n" (show (uid, cmd))
                            runGroup serverStateVar group gs gchan
+                           rec group gs
            Timeout ->
                case maxBlock (map snd (Map.toList votes)) of
                    Nothing -> do spawnFlushCloud _TICK_DELAY gchan
-                                 runGroup serverStateVar group gs gchan
-                   Just Block {content = CloseBlock} ->
-                       do putStrLn "Closed story"
-                          atomically $
-                              do serverState@ServerState {finishedStories = fss} <-
-                                     readTVar serverStateVar
-                                 writeTVar serverStateVar serverState {finishedStories = story : fss}
-                          -- This group is now closed, so drop all messages sent to it.
-                          forever $ do liftIO $ putStrLn "Dropping message"
-                                       _ <- atomically $ readTChan gchan
-                                       broadcastCmd (Refresh group) gs
+                                 rec group gs
+                   Just Block{content = CloseBlock} ->
+                       closeStory serverStateVar group gs gchan story
                    Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
                                 broadcastCmd (Refresh group') gs
-                                runGroup serverStateVar group' gs gchan
-    where
-      maxBlock [] = Nothing
-      maxBlock xs = Just (cloudBlock (maximum xs))
+                                rec group' gs
+  where
+    rec group' gs' = runGroup serverStateVar group' gs' gchan
+    maxBlock [] = Nothing
+    maxBlock xs = Just (cloudBlock (maximum xs))
+
+closeStory :: TVar ServerState -> Group -> GroupState -> GroupChan -> Story -> IO ()
+closeStory ssvar group gs gchan story =
+    do putStrLn "Closed story"
+       atomically $ do sstate@ServerState{closedStories = fss} <- readTVar ssvar
+                       writeTVar ssvar sstate{closedStories = story : fss}
+       -- This group is now closed, so drop all messages sent to it.
+       forever $ do liftIO $ putStrLn "Dropping message"
+                    _ <- atomically $ readTChan gchan
+                    broadcastRefresh group gs
 
 broadcastCmd :: ServerCmd -> GroupState -> IO ()
 broadcastCmd cmd GroupState{groupSinks = sinks} =
@@ -203,6 +212,9 @@ broadcastCmd cmd GroupState{groupSinks = sinks} =
        forM_ (map snd (Map.toList sinks)) sendSink'
   where
     sendSink' sink = WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
+
+broadcastRefresh :: Group -> GroupState -> IO ()
+broadcastRefresh g = broadcastCmd (Refresh g)
 
 -- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
 saveStories :: (MonadIO m) => [Story] -> m ()
@@ -214,8 +226,8 @@ saveStories ss = liftIO $
            do let storyText = BL.pack (show story)
               BL.writeFile (_STORY_DIR </> (showDigest (sha1 storyText))) storyText
 
--- | Load stories from "_STORY_DIR/*".  If the directory does not exist, returns an empty
--- list.
+-- | Load stories from "_STORY_DIR/*".  If the directory does not exist, returns
+--   an empty list.
 loadStories :: (MonadIO m) => m [Story]
 loadStories = liftIO $
     do putStrLn "Loading stories"
@@ -229,7 +241,7 @@ loadStories = liftIO $
            else return []
 
 data Shutdown = Shutdown
-              deriving ( Data, Show, Typeable )
+    deriving (Data, Show, Typeable)
 
 instance Exception Shutdown
 
@@ -238,13 +250,12 @@ instance Exception Shutdown
 serve :: String -> Int -> IO (IO ())
 serve host port =
     do initialStories <- loadStories
-       serverState <- newTVarIO (ServerState { serverGroups    = Map.empty
-                                             , serverCounter   = 0
-                                             , finishedStories = initialStories })
-       tid <- forkIO $
-           CE.handle (\(_ :: Shutdown) -> return ())
-               (runServer host port (preJoin serverState))
-       return (do CE.throwTo tid Shutdown
-                  ServerState{finishedStories = stories} <-
-                              atomically $ readTVar serverState
-                  saveStories stories)
+       serverState <- newTVarIO ServerState{ serverGroups  = Map.empty
+                                           , serverCounter = 0
+                                           , closedStories = initialStories }
+       tid <- forkIO $ CE.handle (\(_ :: Shutdown) -> return ())
+                                 (runServer host port (preJoin serverState))
+       return $ do CE.throwTo tid Shutdown
+                   ServerState{closedStories = stories} <-
+                       atomically (readTVar serverState)
+                   saveStories stories
