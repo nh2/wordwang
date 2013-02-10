@@ -8,6 +8,7 @@ import           Control.Exception (Exception)
 import qualified Control.Exception as CE
 import           Control.Monad (forever, forM, forM_, void, unless, filterM)
 import           Data.Data (Data, Typeable)
+import           Data.Foldable (foldlM)
 import           System.Directory
                  (createDirectory, doesDirectoryExist, getDirectoryContents,
                   doesFileExist)
@@ -101,7 +102,7 @@ runUser gchan uid = forever $ do
     case cmd of
         Join _ ->
             fail "Expecting non-join cmd"
-        _ -> do liftIO $ printf "User %d got message\n" uid
+        _ -> do _ <- liftIO $ printf "User %d got message\n" uid
                 liftIO $ atomically $ writeTChan gchan (ClientCmdFwd uid Nothing cmd)
 
 makeId :: (MonadIO m) => TVar ServerState -> m Int
@@ -179,21 +180,18 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                        do let user   = User uid uname
                               group' = insertUser user group
                               gs'    = insertSink user sink gs
-                          broadcastRefresh group (insertSink user sink gs)
-                          rec group' gs'
+                          broadcastRefresh group gs' >>= rec group'
                    (Nothing, Send blockContent) ->
                        do let (gs', bid) = incCount gs
                               block = Block bid blockContent
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
-                          broadcastRefresh group' gs'
-                          rec group' gs'
+                          broadcastRefresh group' gs' >>= rec group'
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
                            Just cloud' ->
                                do let group' = group {groupCloud = cloud'}
-                                  broadcastRefresh group' gs
-                                  rec group' gs
+                                  broadcastRefresh group' gs >>= rec group'
                            Nothing ->
                                do putStrLn "Upvote for nonexisting message, ignoring"
                                   rec group gs
@@ -209,8 +207,7 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                    Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
-                                broadcastCmd (Refresh group') gs
-                                rec group' gs
+                                broadcastCmd (Refresh group') gs >>= rec group'
   where
     rec group' gs' = runGroup serverStateVar group' gs' gchan
     maxBlock [] = Nothing
@@ -228,17 +225,19 @@ closeStory ssvar group gs gchan story =
                     _ <- atomically $ readTChan gchan
                     broadcastRefresh group gs
 
-broadcastCmd :: ServerCmd -> GroupState -> IO ()
-broadcastCmd cmd GroupState{groupSinks = sinks} =
+broadcastCmd :: ServerCmd -> GroupState -> IO GroupState
+broadcastCmd cmd gs@GroupState{groupSinks = sinks} =
     do putStrLn (show cmd)
-       forM_ (map snd (Map.toList sinks)) sendSink'
+       foldlM sendSink' gs (Map.toList sinks)
   where
-    sendSink' sink =
-        do CE.handle (\(_ :: CE.SomeException) -> do _ <- putStrLn "There's a dead sink"
-                                                     return ()) $
-               WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
+    sendSink' gs0@GroupState{groupSinks = sinks'} (uid, sink) =
+        do CE.handle (\(_ :: CE.SomeException) ->
+                       do _ <- putStrLn "There's a dead sink.  Removing it."
+                          return (gs0{groupSinks = Map.delete uid sinks'})) $
+               do WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
+                  return gs0
 
-broadcastRefresh :: Group -> GroupState -> IO ()
+broadcastRefresh :: Group -> GroupState -> IO GroupState
 broadcastRefresh g = broadcastCmd (Refresh g)
 
 -- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
