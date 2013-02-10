@@ -9,13 +9,10 @@ import           Data.Digest.Pure.SHA (sha1, showDigest)
 import           Control.Exception ( Exception )
 import           Control.Monad (forever, forM, forM_, void, unless, filterM)
 import           Control.Monad.Trans (MonadIO(..))
-import           Data.List (maximumBy)
-import           Data.Ord (comparing)
 
 import           Control.Concurrent.STM
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import           Text.Printf (printf)
 
 import qualified Data.Aeson as Aeson
@@ -175,7 +172,7 @@ runGroup serverStateVar
                                   broadcastCmd (Refresh group') gs
                                   runGroup serverStateVar group' gs gchan
                            Nothing -> undefined
-                   _ -> do liftIO (print (uid, cmd))
+                   _ -> do _ <- printf "got an unexpected command: %s\n" (show (uid, cmd))
                            runGroup serverStateVar group gs gchan
            Timeout ->
                case maxBlock (map snd (Map.toList votes)) of
@@ -197,7 +194,7 @@ runGroup serverStateVar
                                 runGroup serverStateVar group' gs gchan
     where
       maxBlock [] = Nothing
-      maxBlock xs = Just (cloudBlock (maximumBy (comparing (Set.size . cloudUids)) xs))
+      maxBlock xs = Just (cloudBlock (maximum xs))
 
 broadcastCmd :: ServerCmd -> GroupState -> IO ()
 broadcastCmd cmd GroupState{groupSinks = sinks} =
