@@ -1,0 +1,143 @@
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Libre Baskerville'), local('LibreBaskerville-Regular'), url("/fonts/lib/baskerville.woff") format('woff');
+}
+@font-face {
+  font-family: 'Libre Baskerville';
+  font-style: italic;
+  font-weight: 400;
+  src: local('Libre Baskerville Italic'), local('LibreBaskerville-Italic'), url("/fonts/lib/baskerville-italic.woff") format('woff');
+}
+#login-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: auto;
+}
+#login-container #login {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  height: 28em;
+  width: 40em;
+  text-align: center;
+  font-family: 'Libre Baskerville';
+}
+#login-container #login div.title {
+  font-size: 3em;
+  font-weight: 600;
+  margin: 3em auto 0.5em auto;
+}
+#login-container #login div.blurb {
+  padding: 0.5em 1em;
+  margin-bottom: 1em;
+}
+#login-container #login form {
+  margin: 1em auto;
+  display: inline-block;
+}
+#login-container #login form input[type=text] {
+  width: 18em;
+}
+#login-container #login form input[type=submit] {
+  width: 5em;
+}
+#story-container {
+  font-family: 'Libre Baskerville';
+  font-size: 14pt;
+  line-height: normal;
+}
+#story-container p:first-letter {
+  font-size: 2.5em;
+  text-transform: capitalize;
+}
+#flourish {
+  margin-bottom: 1em;
+}
+#middle {
+  margin: 0 auto;
+  width: 45%;
+}
+#end-marker {
+  width: 5px;
+  height: 5px;
+  color: #f00;
+}
+#story-container {
+  position: relative;
+}
+#story-container div:nth-child(4):after {
+  content: '<div class="spacer"></div>';
+}
+.read-more {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background-image: -webkit-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 30%);
+  background-image: -moz-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 30%);
+  background-image: -ms-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 30%);
+  background-image: -o-linear-gradient(top, #fff 0%, rgba(255,255,255,0) 30%);
+  background-image: linear-gradient(top, #fff 0%, rgba(255,255,255,0) 30%);
+}
+#next {
+  display: inline-block;
+  vertical-align: top;
+  transition: height 0.5s;
+  -webkit-transition: height 0.5s;
+}
+#next ul.suggestions {
+  margin: 1em 0;
+  list-style: none;
+  line-height: 40px;
+  position: absolute;
+}
+#next ul.suggestions li.suggestion {
+  display: inline-block;
+  padding: 0.1em 0.2em;
+  vertical-align: middle;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.5s;
+  -webkit-transition: all 0.5s;
+}
+#next ul.suggestions li.suggestion span.votes {
+  border: 1px solid #333;
+  border-radius: 0.3em;
+  padding: 0.1em 0.2em;
+  font-size: 10px;
+  vertical-align: middle;
+}
+#next ul.suggestions li.suggestion span.block {
+  font-family: 'Libre Baskerville';
+  font-style: italic;
+}
+#next ul.suggestionsShown {
+  position: relative;
+}
+#next ul.suggestionsShown li.suggestion {
+  display: block;
+  position: absolute;
+  opacity: 0;
+}
+#next-box {
+  background-image: url("/img/progress_overlay.png");
+  background-repeat: no-repeat;
+}
+#group-label {
+  position: fixed;
+  top: 2px;
+  right: 4px;
+  color: #ccc;
+}
+body {
+  padding: 3em;
+}
