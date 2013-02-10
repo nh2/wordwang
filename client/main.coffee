@@ -71,7 +71,7 @@ class @UI
   # Directly add suggestion to the UI
   addSuggestion: (block, votes=0, blockId=-1) =>
     s = new window.Suggestion(block, votes, blockId)
-    log "displaying suggestion", s
+    log 'displaying suggestion', '"'+s.block()+'"', 'with', s.votes(), 'votes'
     @suggestions.push s
     @sortSuggestions()
 
@@ -84,6 +84,10 @@ class @UI
   setSuggestionVotes: (sug, newv) =>
     sug.votes newv
     @sortSuggestions()
+
+  minSuggestionVotes: =>
+    sug = _.min @suggestions(), (sug) -> sug.votes()
+    sug.votes()
 
   maxSuggestionVotes: =>
     sug = _.max @suggestions(), (sug) -> sug.votes()
