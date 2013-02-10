@@ -186,11 +186,11 @@ instance FromJSON ClientCmd where
 --
 -- @
 -- { "args": { "reason": "newJoin"
---           , { "groupStory": []
---             , "groupCloud": {"3":[{"blockId":3,"content":"hello"},[5]]}
---             , "groupUsers": {"5":{"userId":5,"userName":"francesco"}}
---             , "groupId":7
---             }
+--           , "group": { "groupStory": []
+--                      , "groupCloud": {"3":[{"blockId":3,"content":"hello"},[5]]}
+--                      , "groupUsers": {"5":{"userId":5,"userName":"francesco"}}
+--                      , "groupId":7
+--                      }
 --           }
 -- , "cmd": "refresh"
 -- }
