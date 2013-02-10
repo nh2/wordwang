@@ -39,5 +39,5 @@ Executable wordwang
                         unix,
                         unordered-containers,
                         websockets
-  Ghc-options:          -Wall
+  Ghc-options:          -Wall -Werror
   Main-is:              wordwang.hs
