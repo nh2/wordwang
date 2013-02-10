@@ -142,7 +142,7 @@ getCreateGroup serverStateVar (Just gid) = liftIO $
 
 -- | seconds
 _TICK_DELAY :: Int
-_TICK_DELAY = 5
+_TICK_DELAY = 10
 
 -- | Where are stories saved on disk?
 _STORY_DIR :: FilePath
