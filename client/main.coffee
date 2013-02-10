@@ -146,7 +146,7 @@ class @UI
       .stop()
       .css('background-size', '0% 100%')
       .css('background-color', '#D2D2D2')
-      .animate { 'background-color': 'white' }, 2000
+      .animate { 'background-color': 'white' }, 1000
 
 
   rearrangeSuggestions: =>
