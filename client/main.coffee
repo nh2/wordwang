@@ -197,9 +197,9 @@ class @UI
         ent = $sug.clone()
         ent.css ncss
         ent.addClass "h"+hash
-        show.append ent
         ent.click =>
-          $sug.click()
+          @suggest block
+        show.append ent
         setTimeout =>
           ent.css "opacity", 1
           , 0
