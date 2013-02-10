@@ -76,7 +76,7 @@ class @UI
     s = _.find @suggestions(), (sug) =>
       sug.block() == block
     if s?
-      log "Upvoting id #{s.id}"
+      log "Upvoting id #{s.id()}"
       @server 'upvote', s.id()
     else
       log "Sending block #{block}"
