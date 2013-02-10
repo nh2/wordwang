@@ -5,7 +5,7 @@
     throw n
 
 
-UPDATE_TIME = 5000
+UPDATE_TIME = 10000
 WS_URL = "ws://#{window.location.hostname}:8888/ws"
 
 class @UI
@@ -18,12 +18,13 @@ class @UI
     @username = ko.observable ''
     @voting = false
 
+  # pre: there exists a character c such that block[0] == c
   paragraphs: =>
     paragraphs = []
     paragraph = []
     for block, index in @story()
       paragraph.push block
-      if index % 5 == 4
+      if index % 5 == 4 and block[block.length - 1] == '.'
         paragraphs.push paragraph
         paragraph = []
     if paragraph.length > 0
