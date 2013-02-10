@@ -133,13 +133,6 @@ class @UI
     log '-> server: ', o
     window.send_json o
 
-  # Speak the story using Google Translate
-  speak: =>
-    escapedStory = encodeURIComponent(@story().join(' '))
-    gtUrl = "http://translate.google.com/translate_tts?ie=UTF-8&q=#{escapedStory}&tl=en&total=1&idx=0"
-    log "adding audio to #{gtUrl}"
-    $("<audio class='tts' autoplay='true'><source src='#{gtUrl}' type='audio/mpeg'; codecs='mp3'></audio>").appendTo("body")
-
   clearSuggestions: =>
     show = $ '#next ul.suggestionsShown'
     nxt = $ '#next'
@@ -253,6 +246,15 @@ startAutoScrolling = ->
         startAutoscroll()
 
 
+# Speak the story using Google Translate
+speak = (text) ->
+  # escapedStory = encodeURIComponent(@story().join(' '))
+  escapedText = encodeURIComponent(text)
+  gtUrl = "http://translate.google.com/translate_tts?ie=UTF-8&q=#{escapedText}&tl=en&total=1&idx=0"
+  log "adding audio to #{gtUrl}"
+  $("<audio class='tts' autoplay='true'><source src='#{gtUrl}' type='audio/mpeg'; codecs='mp3'></audio>").appendTo("body")
+
+
 main = ->
   window.ui = ui = new UI()
   ko.applyBindings(ui)
@@ -260,6 +262,10 @@ main = ->
   startAutoScrolling()
 
   connectServer ui
+
+  $(document).on 'click', '#story-container p', null, (e) ->
+    text = $(@).text().replace(/^\s\s*/, '').replace(/\s\s*$/, '')
+    speak text
 
 $ ->
   # Unfortunately not all browsers have window.location.origin
