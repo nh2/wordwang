@@ -49,7 +49,7 @@
         <div class="story_input">
           <div id="next">
             <ul class="suggestions" data-bind="foreach: $root.suggestions">
-              <li class="suggestion" data-bind="style: { fontSize: $data.calcFontSize() }">
+              <li class="suggestion" data-bind="click: function() { $root.suggest($data.block()); }, style: { fontSize: $data.calcFontSize() }">
                 <span class="block" data-bind="text: $data.block"></span>
                 <span class="votes" data-bind="text: $data.votes"></span>
               </li>
@@ -58,7 +58,7 @@
           </div>
           <div id="enter">
             <form data-bind="submit: function() { suggestCurrent(); return false }">
-              <input type="text" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />
+              <input type="text" id="next-box" class="enter_text" placeholder="What happens next?" data-bind="value: suggestion, hasfocus: true" />
             </form>
           </div>
         </div>
