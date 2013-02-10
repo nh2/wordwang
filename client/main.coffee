@@ -59,6 +59,8 @@ class @UI
       else
         log "WARNING: Unhandled cloud content type:", content
 
+    @newBlock() if refresh_info.reason == "storyUpdate"
+
     @sortSuggestions()
 
   # Sends suggestion to the server
