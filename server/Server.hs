@@ -184,6 +184,7 @@ runGroup serverStateVar
                               do serverState@ServerState {finishedStories = fss} <-
                                      readTVar serverStateVar
                                  writeTVar serverStateVar serverState {finishedStories = story : fss}
+                          -- This group is now closed, so drop all messages sent to it.
                           forever $ do liftIO $ putStrLn "Dropping message"
                                        _ <- atomically $ readTChan gchan
                                        broadcastCmd (Refresh group) gs
