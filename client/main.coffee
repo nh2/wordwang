@@ -36,7 +36,6 @@ class @UI
     @suggestion ''
 
   refresh: (refresh_info) =>
-    @joined true
     window.refresh_info = refresh_info
 
     # Reset all observables until we have a finer grained method
@@ -44,6 +43,10 @@ class @UI
     @suggestions []
 
     group = refresh_info.group
+
+    if refresh_info.reason == 'loggedIn'
+      log "loggedIn"
+      @joined true
 
     # Assemble story
     for entry in group.groupStory
