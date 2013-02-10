@@ -11,6 +11,7 @@ WS_URL = "ws://#{window.location.hostname}:8888/ws"
 class @UI
   constructor: ->
     @joined = ko.observable false
+    @groupId = ko.observable null
     @story = ko.observableArray []
     @storyParagraphs = ko.computed @paragraphs
     @suggestion = ko.observable ''
@@ -47,6 +48,7 @@ class @UI
     if refresh_info.reason == 'loggedIn'
       log "loggedIn"
       @joined true
+      @groupId group.groupId
 
     # Assemble story
     for entry in group.groupStory
@@ -76,7 +78,7 @@ class @UI
     s = _.find @suggestions(), (sug) =>
       sug.block() == block
     if s?
-      log "Upvoting id #{s.id}"
+      log "Upvoting id #{s.id()}"
       @server 'upvote', s.id()
     else
       log "Sending block #{block}"
@@ -111,8 +113,10 @@ class @UI
     sug.votes()
 
   joinGroup: =>
+    groupIdMatch = window.location.hash.match(/#(\d+)/)
+    groupId = if groupIdMatch then parseInt(groupIdMatch[1]) else null
     @server 'join',
-      joinGroupId: null
+      joinGroupId: groupId
       joinUserName: @username()
 
   server: (cmd, args) =>
