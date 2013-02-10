@@ -196,6 +196,9 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                        do let user   = User uid uname
                               group' = insertUser user group
                               gs'    = insertSink user sink gs
+                          WS.sendSink sink (WS.DataMessage
+                                            (WS.Text (Aeson.encode (Refresh group' LoggedIn))))
+                              `CE.catch` (\(_ :: CE.SomeException) -> return ())
                           broadcastRefresh group' NewJoin gs' >>= uncurry rec
                    (Nothing, Send blockContent) ->
                        do let (gs', bid) = incCount gs

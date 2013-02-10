@@ -201,7 +201,7 @@ data ServerCmd =
                                    --   that they can update the page.
     deriving (Eq, Show, Generic)
 
-data ServerCmdReason = NewJoin | CloudUpdate | StoryUpdate | NoChanges
+data ServerCmdReason = NewJoin | CloudUpdate | StoryUpdate | NoChanges | LoggedIn
     deriving (Eq, Show, Generic)
 
 instance ToJSON ServerCmdReason where
@@ -209,6 +209,7 @@ instance ToJSON ServerCmdReason where
     toJSON CloudUpdate = Aeson.String "cloudUpdate"
     toJSON StoryUpdate = Aeson.String "storyUpdate"
     toJSON NoChanges   = Aeson.String "noChanges"
+    toJSON LoggedIn    = Aeson.String "loggedIn"
 
 instance ToJSON ServerCmd where
     toJSON (Refresh group reason) =
