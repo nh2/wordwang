@@ -50,6 +50,7 @@ class @UI
       log "loggedIn"
       @joined true
       @groupId group.groupId
+      window.location.hash = group.groupId
 
     # Assemble story
     for entry in group.groupStory
