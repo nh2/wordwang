@@ -37,12 +37,11 @@ type Id = Int
 data Block = Block
     { blockId :: BlockId
     , content :: BlockContent
-    } deriving (Eq, Show, Generic)
+    } deriving (Eq, Show, Generic, Read)
 type BlockId = Id
-data BlockContent
-    = StringBlock Text
-    | CloseBlock
-    deriving (Eq, Show, Generic)
+data BlockContent = StringBlock Text
+                  | CloseBlock
+    deriving (Eq, Show, Generic, Read)
 
 instance Hashable BlockContent
 instance Hashable Block
@@ -69,9 +68,22 @@ instance IsString BlockContent where
 --   @'Set' ['UserId']@ stores the upvotes.
 --
 --   @{"3": [{"blockId": 3, "content": "hello"}, [5]]}@
-data Cloud = Cloud (Map BlockId (Block, Set UserId))
+
+data Cloud = Cloud (Map BlockId CloudItem)
                    (HashSet Block)
     deriving (Eq, Show, Generic)
+
+instance ToJSON Cloud where
+    toJSON (Cloud votes _) = toJSON votes
+
+data CloudItem
+    = CloudItem { cloudBlock :: Block
+                , cloudUids :: Set UserId
+                }
+      deriving (Eq, Show, Generic)
+
+instance FromJSON CloudItem
+instance ToJSON CloudItem
 
 newCloud :: Cloud
 newCloud = Cloud Map.empty HashSet.empty
@@ -81,7 +93,7 @@ insertBlock b@(Block bid _) uid cloud@(Cloud votes hs) =
     if HashSet.member b hs
     then fromJust (upvoteBlock bid uid cloud)
     else case Map.lookup bid votes of
-             Nothing -> Cloud (Map.insert bid (b, Set.fromList [uid]) votes)
+             Nothing -> Cloud (Map.insert bid (CloudItem b $ Set.fromList [uid]) votes)
                               (HashSet.insert b hs)
              Just _ -> error "insertBlock: the impossible happened!"
 
@@ -89,11 +101,8 @@ upvoteBlock :: BlockId -> UserId -> Cloud -> Maybe Cloud
 upvoteBlock bid uid (Cloud votes hs) =
     case Map.lookup bid votes of
         Nothing -> Nothing
-        Just (b, voters) ->
-            Just (Cloud (Map.insert bid (b, Set.insert uid voters) votes) hs)
-
-instance FromJSON Cloud
-instance ToJSON Cloud
+        Just (CloudItem b voters) ->
+            Just (Cloud (Map.insert bid (CloudItem b $ Set.insert uid voters) votes) hs)
 
 -- | @{"userId": 5, "userName": "francesco"}@
 data User = User
@@ -124,7 +133,6 @@ data Group = Group
 type GroupId = Id
 type Story = [Block]
 
-instance FromJSON Group
 instance ToJSON Group
 
 -------------------------------------------------------------------------------
@@ -186,12 +194,12 @@ data ServerCmd = Refresh Group  -- ^ After any event change, the server sends
 instance ToJSON ServerCmd where
     toJSON (Refresh group) = cmdJSON "refresh" group
 
-instance FromJSON ServerCmd where
-    parseJSON js =
-        do (name, args)  <- jsonCmd js
-           case name of
-               "refresh" -> Refresh <$> parseJSON args
-               _         -> mzero
+-- instance FromJSON ServerCmd where
+--     parseJSON js =
+--         do (name, args)  <- jsonCmd js
+--            case name of
+--                "refresh" -> Refresh <$> parseJSON args
+--                _         -> mzero
 
 -- Utils
 

@@ -28,49 +28,116 @@ class @UI
       paragraphs.push paragraph
     paragraphs
 
-  suggest: (args...) =>
-    @addSuggestion(@suggestion())
+  suggestCurrent: =>
+    @suggest @suggestion()
     @suggestion ''
 
-  refresh: (args) =>
+  refresh: (refresh_info) =>
     @joined true
-    window.args = args
+    window.refresh_info = refresh_info
+
+    # Reset all observables until we have a finer grained method
+    @story []
+    @suggestions []
 
     # Assemble story
-    for entry in args.groupStory
-      @story.push entry.content
+    for entry in refresh_info.groupStory
+      { blockType, blockContent } = entry.content
+      if blockType == 'string'
+        @story.push blockContent
+      else
+        log "ingoring story entry of unknown content:", entry
 
-    for entry in args.groupCloud
-      log "entry", entry
+    for entry in refresh_info.groupCloud
       votes = entry.cloudUids.length
-      s = new suggestion(entry.cloudBlock, votes)
-      s.add()
+      @addSuggestion(entry.cloudBlock, votes, entry.cloudId)
 
-  ## Suggestions Manipulation
-  addSuggestion: (block, votes = 0) =>
-    s = new window.Suggestion(block, votes)
-    @suggestions.push(s)
+  # Sends suggestion to the server
+  suggest: (block) =>
+    s = _.findWhere(@suggestions, { block: block })
+    if s
+      log "Upvoting id #{s.id}"
+      @server 'upvote', s.id
+    else
+      log "Sending block #{block}"
+      @server 'send',
+        blockType: 'string'
+        blockContent: block
+
+  # Directly add suggestion to the UI
+  addSuggestion: (block, votes=0, blockId=-1) =>
+    s = new window.Suggestion(block, votes, blockId)
+    @suggestions.push s
     @sortSuggestions()
 
   sortSuggestions: =>
     @suggestions.sort (a,b) -> b.votes() - a.votes()
+    setTimeout @rearrangeSuggestions, 0
 
-  setSuggestionVotes: (sug, newv) ->
+  setSuggestionVotes: (sug, newv) =>
     sug.votes newv
     @sortSuggestions()
 
-  maxSuggestionVotes: ->
+  maxSuggestionVotes: =>
     sug = _.max @suggestions(), (sug) -> sug.votes()
     sug.votes()
 
   joinGroup: =>
-    window.send_json
-      cmd: 'join'
-      args:
-        joinGroupId: null
-        joinUserName: @username()
+    @server 'join',
+      joinGroupId: null
+      joinUserName: @username()
 
-    false # to prevent submit
+  server: (cmd, args) =>
+    o =
+      cmd: cmd
+      args: args
+    log '-> server: ', o
+    window.send_json o
+
+  rearrangeSuggestions: =>
+    show = $ '#next ul.suggestionsShown'
+    orig = $ '#next ul.suggestions:not(.suggestionsShown)'
+    cont = $ 'div.story_input'
+    nxt = $ '#next'
+
+    # Move hidden ul which uses knockout
+    oh = orig.outerHeight true
+    ncss =
+      top: -(cont.offset().top + oh)
+      width: cont.width()
+    orig.css ncss
+    nxt.height oh;
+
+    # Apply location from hidden elem to shown elem
+    orig.children().each (i, sug) =>
+      $sug = $ sug
+      block = $("span.block", $sug).html()
+      votes = $("span.votes", $sug).html()
+      hash = (murmurhash3_32_gc block).toString()
+      shown = $ "li.h"+hash, show
+      # Fade in element if not there yet
+      pos = $sug.position()
+      ncss =
+        top: pos.top
+        left: pos.left
+        width: $sug.outerWidth()
+        'font-size': $sug.css 'font-size'
+      if !shown.length
+        ent = $sug.clone()
+        ent.css ncss
+        ent.addClass "h"+hash
+        show.append ent
+        setTimeout =>
+          ent.css "opacity", 1
+          , 0
+      # Animate existing element otherwise
+      else
+        shown.css ncss
+        $("span.votes", shown).html votes
+        setTimeout =>
+          shown.css "opacity", 1
+          , 0
+    #copy.remove()
 
 connectServer = (ui) ->
   window.ws = ws = new WebSocket(WS_URL, "protocolOne")
@@ -87,7 +154,7 @@ connectServer = (ui) ->
 
   ws.onmessage = (data) ->
     msg = JSON.parse(data.data)
-    console.log 'Received', msg
+    console.log '<- server', msg
     dispatch = dispatcher[msg.cmd]
     if dispatch?
       dispatch(msg.args)
