@@ -142,6 +142,7 @@ class @UI
   startVoting: =>
     @voting = true
     $('#next-box')
+      .css('progress', '0%')
       .animate { 'progress': '100%' }, # bit of a hack
         duration: UPDATE_TIME
         easing: 'linear'
