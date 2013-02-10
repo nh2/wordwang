@@ -16,6 +16,7 @@ class @UI
     @suggestion = ko.observable ''
     @suggestions = ko.observableArray []
     @username = ko.observable ''
+    @voting = false
 
   paragraphs: =>
     paragraphs = []
@@ -60,6 +61,7 @@ class @UI
         log "WARNING: Unhandled cloud content type:", content
 
     @newBlock() if refresh_info.reason == "storyUpdate"
+    @startVoting() if refresh_info.reason == "cloudUpdate" and not @voting
 
     @sortSuggestions()
 
@@ -126,13 +128,20 @@ class @UI
     show.html ''
     nxt.height 0
 
-  newBlock: =>
+  startVoting: =>
+    @voting = true
     $('#next-box')
-      .css('background-size', '0%')
       .animate { 'progress': '100%' }, # bit of a hack
         duration: UPDATE_TIME
         easing: 'linear'
         step: (now) -> $(@).css 'background-size', "#{now}% 100%"
+
+
+  newBlock: =>
+    @voting = false
+    $('#next-box')
+      .stop()
+      .css('background-size', '0% 100%')
 
   rearrangeSuggestions: =>
     show = $ '#next ul.suggestionsShown'

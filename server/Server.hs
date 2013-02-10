@@ -7,7 +7,7 @@ import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Exception (Exception)
 import qualified Control.Exception as CE
-import           Control.Monad (forever, forM, forM_, void, unless, filterM)
+import           Control.Monad (forever, forM, forM_, void, unless, filterM, when)
 import           Data.Data (Data, Typeable)
 import           Data.Foldable (foldlM)
 import           System.FilePath ((</>))
@@ -165,7 +165,6 @@ createGroup serverStateVar gid = liftIO $
            do serverState@ServerState {serverGroups = gs} <- readTVar serverStateVar
               writeTVar serverStateVar
                         (serverState { serverGroups = Map.insert gid groupChan gs })
-       spawnFlushCloud _TICK_DELAY groupChan
        _ <- forkIO (runGroup serverStateVar
                              group
                              (GroupState {groupSinks = Map.empty, groupCounter = 0})
@@ -199,6 +198,7 @@ runGroup serverStateVar
                               block = Block bid blockContent
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
+                          when (cloudEmpty cloud) (spawnFlushCloud _TICK_DELAY gchan)
                           broadcastRefresh group' CloudUpdate gs' >>= uncurry rec
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
@@ -213,13 +213,11 @@ runGroup serverStateVar
                            rec group gs
            Timeout ->
                case maxBlock (map snd (Map.toList votes)) of
-                   Nothing -> do spawnFlushCloud _TICK_DELAY gchan
-                                 rec group gs
+                   Nothing -> fail "Timeout received with no blocks!"
                    Just Block{content = CloseBlock} ->
                        closeStory serverStateVar group gs gchan story
                    Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
-                                spawnFlushCloud _TICK_DELAY gchan
                                 broadcastRefresh group' StoryUpdate gs >>= uncurry rec
   where
     rec group' gs' = runGroup serverStateVar group' gs' gchan

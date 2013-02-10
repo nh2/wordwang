@@ -107,6 +107,9 @@ upvoteBlock bid uid (Cloud votes hs) =
         Just (CloudItem b voters) ->
             Just (Cloud (Map.insert bid (CloudItem b (Set.insert uid voters)) votes) hs)
 
+cloudEmpty :: Cloud -> Bool
+cloudEmpty (Cloud votes _) = Map.null votes
+
 -- | @{"userId": 5, "userName": "francesco"}@
 data User = User
     { userId   :: UserId
