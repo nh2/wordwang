@@ -65,9 +65,14 @@
             </form>
           </div>
         </div>
-        <ul class="group_members" data-bind="foreach: $root.members">
-          <li class="group_member" data-bind:"text: $data.username"></li>
-        </ul>
+
+        <div id="user-panel">
+          by
+          <ul class="group_members" data-bind="foreach: $root.members">
+            <li class="group_member" data-bind="text: $data.userName"></li>
+          </ul>
+        </div>
+
       </div>
     </div>
   </body>
