@@ -6,7 +6,7 @@
 
 
 UPDATE_TIME = 5000
-WS_URL = "ws://"+window.location.host+"/ws"
+WS_URL = "ws://#{window.location.hostname}:8888/ws"
 
 class @UI
   constructor: ->
