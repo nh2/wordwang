@@ -113,6 +113,13 @@ class @UI
     log '-> server: ', o
     window.send_json o
 
+  # Speak the story using Google Translate
+  speak: =>
+    escapedStory = encodeURIComponent(@story().join(' '))
+    gtUrl = "http://translate.google.com/translate_tts?ie=UTF-8&q=#{escapedStory}&tl=en&total=1&idx=0"
+    log "adding audio to #{gtUrl}"
+    $("<audio class='tts' autoplay='true'><source src='#{gtUrl}' type='audio/mpeg'; codecs='mp3'></audio>").appendTo("body")
+
   clearSuggestions: =>
     show = $ '#next ul.suggestionsShown'
     nxt = $ '#next'
