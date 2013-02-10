@@ -5,8 +5,8 @@
     throw n
 
 
-WS_URL = "ws://localhost:8888/"
 UPDATE_TIME = 5000
+WS_URL = "ws://"+window.location.host+"/ws"
 
 class @UI
   constructor: ->
