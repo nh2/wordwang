@@ -18,6 +18,7 @@ class @UI
     @suggestions = ko.observableArray []
     @username = ko.observable ''
     @voting = false
+    @members = ko.observableArray []
 
   # pre: there exists a character c such that block[0] == c
   paragraphs: =>
@@ -68,6 +69,12 @@ class @UI
 
     @newBlock() if refresh_info.reason == "storyUpdate"
     @startVoting() if refresh_info.reason == "cloudUpdate" and not @voting
+
+    if refresh_info.reason == "newJoin"
+      ms = []
+      for uid, member of group.groupUsers
+        ms.push member
+      @members ms
 
     @sortSuggestions()
 

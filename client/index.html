@@ -24,6 +24,10 @@
   <body>
     <div id="middle">
 
+      <div id="group-label">
+        <span data-bind="text: groupId">GROUP_ID</span>
+      </div>
+
       <div data-bind="ifnot: joined">
         <div id="login-container">
           <div id="login">
@@ -61,6 +65,9 @@
             </form>
           </div>
         </div>
+        <ul class="group_members" data-bind="foreach: $root.members">
+          <li class="group_member" data-bind:"text: $data.username"></li>
+        </ul>
       </div>
     </div>
   </body>
