@@ -2,10 +2,6 @@ COLOR_TEXT_HIGHLIGHT = #a2b5c6
 COLOR_TEXT_LIGHT = #bccddc
 COLOR_TEXT_GRAY = #68727b
 
-html,
-body
-  height: 100%
-
 background-linear-gradient(startPoint, startColor, startInterval, endColor, endInterval, deprecatedWebkitStartPoint = false, deprecatedWebkitEndPoint = false)
   if deprecatedWebkitStartPoint && deprecatedWebkitEndPoint
     background-image -webkit-gradient(linear, deprecatedWebkitStartPoint, deprecatedWebkitEndPoint, color-stop(startInterval, startColor), color-stop(endInterval, endColor))
@@ -26,7 +22,6 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
   font-style: italic
   font-weight: 400
   src: local('Libre Baskerville Italic'), local('LibreBaskerville-Italic'), url('/fonts/lib/baskerville-italic.woff') format('woff')
-
 
 #login-container
   width: 100%
@@ -68,25 +63,14 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
 
 
 
+#story-container
+  font-family: 'Libre Baskerville'
+  font-size: 14pt
+  line-height: normal
+
 #middle
   margin: 0 auto
   width: 45%
-  height: 100%
-
-  > div
-    height: 100%
-    position: absolute
-
-    #main
-      height: 100%
-      display: box
-      display: -webkit-box
-      box-orient: vertical
-      -webkit-box-orient: vertical
-
-      div.story_input
-        box-flex: 0
-        -webkit-box-flex: 0
 
 #end-marker
   width: 5px
@@ -95,11 +79,6 @@ background-linear-gradient(startPoint, startColor, startInterval, endColor, endI
 
 #story-container
   position: relative
-  box-flex: 1
-  -webkit-box-flex: 1
-  font-family: 'Libre Baskerville'
-  font-size: 14pt
-  line-height: normal
 
   div:nth-child(4):after
     content: '<div class="spacer"></div>'
