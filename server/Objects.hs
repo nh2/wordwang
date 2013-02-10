@@ -5,7 +5,9 @@ module Objects where
 
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad (mzero)
+import           Data.List (maximumBy)
 import           Data.Maybe (fromJust)
+import           Data.Ord (comparing)
 import           Data.String (IsString(..))
 import           GHC.Generics (Generic)
 
@@ -76,11 +78,10 @@ data Cloud = Cloud (Map BlockId CloudItem)
 instance ToJSON Cloud where
     toJSON (Cloud votes _) = toJSON votes
 
-data CloudItem
-    = CloudItem { cloudBlock :: Block
-                , cloudUids :: Set UserId
-                }
-      deriving (Eq, Show, Generic)
+data CloudItem = CloudItem
+    { cloudBlock :: Block
+    , cloudUids :: Set UserId
+    } deriving (Eq, Show, Generic)
 
 instance FromJSON CloudItem
 instance ToJSON CloudItem
@@ -102,7 +103,14 @@ upvoteBlock bid uid (Cloud votes hs) =
     case Map.lookup bid votes of
         Nothing -> Nothing
         Just (CloudItem b voters) ->
-            Just (Cloud (Map.insert bid (CloudItem b $ Set.insert uid voters) votes) hs)
+            Just (Cloud (Map.insert bid (CloudItem b (Set.insert uid voters)) votes) hs)
+
+bestBlock :: Cloud -> Maybe Block
+bestBlock (Cloud votes _) = go (map snd (Map.toList votes))
+  where
+    go [] = Nothing
+    go xs = Just (cloudBlock (maximumBy (comparing (Set.size . cloudUids)) xs))
+
 
 -- | @{"userId": 5, "userName": "francesco"}@
 data User = User
@@ -132,6 +140,10 @@ data Group = Group
     } deriving (Eq, Show, Generic)
 type GroupId = Id
 type Story = [Block]
+
+insertUser :: User -> Group -> Group
+insertUser u@User{userId = uid} g@Group{groupUsers = users} =
+    g{groupUsers = Map.insert uid u users}
 
 instance ToJSON Group
 
