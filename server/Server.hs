@@ -96,11 +96,13 @@ preJoin serverStateVar rq =
 
 runUser :: GroupChan -> UserId -> WebSockets WebSocketProtocol ()
 runUser gchan uid = forever $ do
-    _ <- liftIO $ printf "Waiting for msg for user %s\n" (show uid)
+    _ <- liftIO $ printf "Waiting for msg for user %d\n" uid
     cmd <- receiveClientCmd
     case cmd of
-        Join _ -> fail "Expecting non-join cmd"
-        _ -> liftIO $ atomically $ writeTChan gchan (ClientCmdFwd uid Nothing cmd)
+        Join _ ->
+            fail "Expecting non-join cmd"
+        _ -> do liftIO $ printf "User %d got message\n" uid
+                liftIO $ atomically $ writeTChan gchan (ClientCmdFwd uid Nothing cmd)
 
 makeId :: (MonadIO m) => TVar ServerState -> m Int
 makeId serverStateVar = liftIO $ atomically $
@@ -158,7 +160,9 @@ createGroup serverStateVar gid = liftIO $
        _ <- forkIO (runGroup serverStateVar
                              group
                              (GroupState {groupSinks = Map.empty, groupCount = 0})
-                             groupChan)
+                             groupChan
+                   `CE.finally` do _ <- printf "\n######## GROUP %d DIED ########\n\n" gid
+                                   return ())
        return groupChan
 
 spawnFlushCloud :: (MonadIO m, Functor m) => Int -> GroupChan -> m ()
@@ -229,7 +233,10 @@ broadcastCmd cmd GroupState{groupSinks = sinks} =
     do putStrLn (show cmd)
        forM_ (map snd (Map.toList sinks)) sendSink'
   where
-    sendSink' sink = WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
+    sendSink' sink =
+        do CE.handle (\(_ :: CE.SomeException) -> do _ <- putStrLn "There's a dead sink"
+                                                     return ()) $
+               WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
 
 broadcastRefresh :: Group -> GroupState -> IO ()
 broadcastRefresh g = broadcastCmd (Refresh g)
