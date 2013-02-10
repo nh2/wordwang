@@ -155,10 +155,6 @@ _TICK_DELAY = 5
 _STORY_DIR :: FilePath
 _STORY_DIR = "stories"
 
--- | Where are the files to be served?
-_HTML_DIR :: FilePath
-_HTML_DIR = "html"
-
 -- | There's a 1 in _NEW_GROUP_P chance of creating a new group when a user joins without
 -- specifying one.
 _NEW_GROUP_P :: Int
@@ -200,18 +196,18 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                        do let user   = User uid uname
                               group' = insertUser user group
                               gs'    = insertSink user sink gs
-                          broadcastRefresh group' gs' >>= uncurry rec
+                          broadcastRefresh group' NewJoin gs' >>= uncurry rec
                    (Nothing, Send blockContent) ->
                        do let (gs', bid) = incCount gs
                               block = Block bid blockContent
                               cloud' = insertBlock block uid cloud
                               group' = group {groupCloud = cloud'}
-                          broadcastRefresh group' gs' >>= uncurry rec
+                          broadcastRefresh group' CloudUpdate gs' >>= uncurry rec
                    (Nothing, Upvote bid) ->
                        case upvoteBlock bid uid cloud of
                            Just cloud' ->
                                do let group' = group {groupCloud = cloud'}
-                                  broadcastRefresh group' gs >>= uncurry rec
+                                  broadcastRefresh group' CloudUpdate gs >>= uncurry rec
                            Nothing ->
                                do putStrLn "Upvote for nonexisting message, ignoring"
                                   rec group gs
@@ -227,7 +223,7 @@ runGroup serverStateVar group@Group{groupCloud = cloud@(Cloud votes _), groupSto
                    Just b -> do let group' = group { groupStory = story ++ [b]
                                                    , groupCloud = newCloud }
                                 spawnFlushCloud _TICK_DELAY gchan
-                                broadcastCmd (Refresh group') group' gs >>= uncurry rec
+                                broadcastRefresh group' StoryUpdate gs >>= uncurry rec
   where
     rec group' gs' = runGroup serverStateVar group' gs' gchan
     maxBlock [] = Nothing
@@ -243,7 +239,7 @@ closeStory ssvar group gs gchan story =
        -- This group is now closed, so drop all messages sent to it.
        forever $ do liftIO $ putStrLn "Dropping message"
                     _ <- atomically $ readTChan gchan
-                    broadcastRefresh group gs
+                    broadcastRefresh group NoChanges gs
 
 broadcastCmd :: ServerCmd -> Group -> GroupState -> IO (Group, GroupState)
 broadcastCmd cmd group gs@GroupState{groupSinks = sinks} =
@@ -261,8 +257,8 @@ broadcastCmd cmd group gs@GroupState{groupSinks = sinks} =
                   WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
                   return (grp0, gs0)
 
-broadcastRefresh :: Group -> GroupState -> IO (Group, GroupState)
-broadcastRefresh g = broadcastCmd (Refresh g) g
+broadcastRefresh :: Group -> ServerCmdReason -> GroupState -> IO (Group, GroupState)
+broadcastRefresh g reason = broadcastCmd (Refresh g reason) g
 
 -- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
 saveStories :: (MonadIO m) => [Story] -> m ()
@@ -293,16 +289,16 @@ data Shutdown = Shutdown
 
 instance Exception Shutdown
 
-server :: TVar ServerState -> Snap ()
-server ssvar =
+server :: TVar ServerState -> FilePath -> Snap ()
+server ssvar fp =
     do req <- Snap.rqPathInfo <$> Snap.getRequest
        if req == "ws" then WS.runWebSocketsSnap (preJoin ssvar)
-           else Snap.serveDirectory _HTML_DIR
+           else Snap.serveDirectory fp
 
 -- | Start the WordWang server on the given host and port, return immediately,
 --   and return an action that shuts down the server.
-serve :: ByteString -> Int -> IO (IO ())
-serve host port =
+serve :: ByteString -> Int -> FilePath -> IO (IO ())
+serve host port fp =
     do initialStories <- loadStories
        serverState <- newTVarIO ServerState{ serverGroups  = Map.empty
                                            , serverCounter = 0
@@ -310,7 +306,7 @@ serve host port =
        let config :: Snap.Config Snap () = Snap.setHostname host
                                            (Snap.setPort port mempty)
        tid <- forkIO $ CE.handle (\(_ :: Shutdown) -> return ())
-                                 (Snap.simpleHttpServe config (server serverState))
+                                 (Snap.simpleHttpServe config (server serverState fp))
        return $ do CE.throwTo tid Shutdown
                    ServerState{closedStories = stories} <-
                        atomically (readTVar serverState)
