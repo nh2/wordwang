@@ -21,22 +21,23 @@ Source-repository head
 
 Executable wordwang
   Build-depends:        base >= 4 && < 5,
+                        SHA,
                         aeson,
+                        ansi-terminal,
                         bytestring,
+                        containers,
                         directory,
                         filepath,
-                        websockets,
-                        text,
-                        mtl,
-                        containers,
-                        unordered-containers,
                         ghc-prim,
-                        stm,
-                        time,
-                        ansi-terminal,
-                        unix,
-                        SHA,
                         hashable,
-                        random
+                        hslogger,
+                        mtl,
+                        random,
+                        stm,
+                        text,
+                        time,
+                        unix,
+                        unordered-containers,
+                        websockets
   Ghc-options:          -Wall
   Main-is:              wordwang.hs
