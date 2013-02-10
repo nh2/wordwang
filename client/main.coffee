@@ -236,9 +236,22 @@ connectServer = (ui) ->
 
 
 startAutoScrolling = ->
-  setInterval(->
-    $("html, body").animate({ scrollTop: $(document).height() })
-  , 1000)
+  startAutoscroll = ->
+    window.autoscrollInterval = setInterval(->
+      $("html, body").animate({ scrollTop: $(document).height() })
+    , 1000)
+
+  startAutoscroll()
+
+  # TODO use cross-browser jquery plugin for this
+  document.onmousewheel = (e) ->
+    if e.wheelDeltaY > 0
+      clearInterval window.autoscrollInterval
+      window.autoscrollInterval = null
+    else
+      if not window.autoscrollInterval
+        startAutoscroll()
+
 
 main = ->
   window.ui = ui = new UI()
