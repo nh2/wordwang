@@ -67,8 +67,11 @@ class @UI
 
   # Sends suggestion to the server
   suggest: (block) =>
-    s = _.findWhere(@suggestions, { block: block })
-    if s
+    if block == ""
+      return
+    s = _.find @suggestions(), (sug) =>
+      sug.block() == block
+    if s?
       log "Upvoting id #{s.id}"
       @server 'upvote', s.id
     else
