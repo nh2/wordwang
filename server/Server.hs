@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Server where
 
+import           Control.Applicative ((<$>))
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Exception (Exception)
 import qualified Control.Exception as CE
