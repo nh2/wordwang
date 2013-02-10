@@ -5,7 +5,7 @@
     throw n
 
 
-UPDATE_TIME = 5000
+UPDATE_TIME = 10000
 WS_URL = "ws://#{window.location.hostname}:8888/ws"
 
 class @UI
