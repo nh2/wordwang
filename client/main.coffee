@@ -6,6 +6,7 @@
 
 
 WS_URL = "ws://localhost:8888/"
+UPDATE_TIME = 5000
 
 class @UI
   constructor: ->
@@ -114,6 +115,13 @@ class @UI
     show.html ''
     nxt.height 0
 
+  newBlock: =>
+    $('#next-box')
+      .css('background-size', '0%')
+      .animate { 'progress': '100%' }, # bit of a hack
+        duration: UPDATE_TIME
+        easing: 'linear'
+        step: (now) -> $(@).css 'background-size', "#{now}% 100%"
 
   rearrangeSuggestions: =>
     show = $ '#next ul.suggestionsShown'
