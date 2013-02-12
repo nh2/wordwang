@@ -17,7 +17,7 @@ import Data.Map ( Map )
 import Network.WebSockets ( Request, WebSockets, Hybi00, Sink )
 import Objects ( ServerCmd(..), Group(..), Block(..), ClientCmd(..), Cloud(..)
                , ServerCmdReason(..), BlockContent(..), Story, User(..), UserId
-               , GroupId, JoinPayload(..)
+               , GroupId, JoinPayload(..), CloudItem(..)
                , newCloud, insertUser, insertBlock, cloudEmpty, upvoteBlock, cloudBlock )
 import System.Directory ( createDirectory, doesDirectoryExist, getDirectoryContents, doesFileExist )
 import System.FilePath ( (</>) )
@@ -77,26 +77,13 @@ data Shutdown = Shutdown
 
 instance Exception Shutdown
 
-insertSink :: User -> Sink WebSocketProtocol -> GroupState -> GroupState
-insertSink User{ userId = uid } sink gs@GroupState{ groupSinks = sinks } =
-    gs{ groupSinks = Map.insert uid sink sinks }
+------------------------------------------
+-- User handler threads
+------------------------------------------
 
-incCount :: GroupState -> (GroupState, Int)
-incCount gs@GroupState{ groupCounter = i } = (gs{ groupCounter = i + 1 }, i)
-
-receiveClientCmd :: WebSockets WebSocketProtocol (Maybe ClientCmd)
-receiveClientCmd = do
-    msg <- WS.receive
-    case msg of
-        WS.ControlMessage _ ->
-            return Nothing
-        WS.DataMessage (WS.Text t) ->
-            Just <$> maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' t)
-        WS.DataMessage (WS.Binary b) ->
-            Just <$> maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' b)
-
-preJoin :: TVar ServerState -> Request -> WebSockets WebSocketProtocol ()
-preJoin serverStateVar rq = do
+-- to it.
+waitForUserJoin :: TVar ServerState -> Request -> WebSockets WebSocketProtocol ()
+waitForUserJoin serverStateVar rq = do
     WS.acceptRequest rq
     mcmd <- receiveClientCmd
     case mcmd of
@@ -106,12 +93,13 @@ preJoin serverStateVar rq = do
             gchan <- getCreateGroup serverStateVar mGroupId
             sink <- WS.getSink
             liftIO $ atomically $ writeTChan gchan (ClientCmdFwd uid (Just sink) cmd)
-            runUser gchan uid
+            forwardUserCmds gchan uid
         _ ->
             fail "Expecting join message"
 
-runUser :: TChan GroupCmd -> UserId -> WebSockets WebSocketProtocol ()
-runUser gchan uid = forever $ do
+-- | Forward user commands to the connected group.
+forwardUserCmds :: TChan GroupCmd -> UserId -> WebSockets WebSocketProtocol ()
+forwardUserCmds gchan uid = forever $ do
     _ <- liftIO $ printf "Waiting for msg for user %d\n" uid
     mcmd <- receiveClientCmd
     case mcmd of
@@ -123,12 +111,20 @@ runUser gchan uid = forever $ do
         Nothing ->
             liftIO $ putStrLn "User got a control message"
 
-makeId :: (MonadIO m) => TVar ServerState -> m Int
-makeId serverStateVar = liftIO $ atomically $ do
-    serverState@ServerState {serverCounter = i} <- readTVar serverStateVar
-    writeTVar serverStateVar (serverState {serverCounter = i + 1})
-    return i
+-- | Receive a single 'ClientCmd'.  May fail due to parse errors.
+receiveClientCmd :: WebSockets WebSocketProtocol (Maybe ClientCmd)
+receiveClientCmd = do
+    msg <- WS.receive
+    case msg of
+        WS.ControlMessage _ ->
+            return Nothing
+        WS.DataMessage (WS.Text t) ->
+            Just <$> maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' t)
+        WS.DataMessage (WS.Binary b) ->
+            Just <$> maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' b)
 
+-- | Wait for a user to join the server, assign them to a group, and forward all commands
+-- | Get the existing group for the given ID, or create a new one with it.
 getCreateGroup :: (MonadIO m) => TVar ServerState -> Maybe GroupId -> m (TChan GroupCmd)
 getCreateGroup serverStateVar Nothing = liftIO $ do
     ServerState {serverGroups = gs} <- atomically $ readTVar serverStateVar
@@ -152,6 +148,7 @@ getCreateGroup serverStateVar (Just gid) = liftIO $ do
         Just gchan -> return gchan
         Nothing    -> createGroup serverStateVar gid
 
+-- | Create a group with the given 'GroupId'.  This ID /must/ be fresh.
 createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m (TChan GroupCmd)
 createGroup serverStateVar gid = liftIO $ do
     let group = Group { groupId = gid
@@ -173,10 +170,19 @@ createGroup serverStateVar gid = liftIO $ do
                      return ())
     return groupChan
 
-spawnFlushCloud :: (MonadIO m, Functor m) => Int -> TChan GroupCmd -> m ()
-spawnFlushCloud secs gchan = void . liftIO . forkIO $ do
-    threadDelay (secs * 1000000); atomically $ writeTChan gchan Timeout
+-- | Generate a new unique ID in the server's scope.  This is used to generate 'UserId's
+-- and 'GroupId's.
+makeId :: (MonadIO m) => TVar ServerState -> m Int
+makeId serverStateVar = liftIO $ atomically $ do
+    serverState@ServerState {serverCounter = i} <- readTVar serverStateVar
+    writeTVar serverStateVar (serverState {serverCounter = i + 1})
+    return i
 
+------------------------------------------
+-- Group threads
+------------------------------------------
+
+-- | Run a group thread.
 runGroup :: TVar ServerState -> Group -> GroupState -> TChan GroupCmd -> IO ()
 runGroup serverStateVar
          group@Group{ groupCloud = cloud@(Cloud votes _)
@@ -200,7 +206,7 @@ runGroup serverStateVar
                         block = Block bid blockContent
                         cloud' = insertBlock block uid cloud
                         group' = group {groupCloud = cloud'}
-                    when (cloudEmpty cloud) (spawnFlushCloud roundTime gchan)
+                    when (cloudEmpty cloud) (spawnFlushCloud roundTime)
                     broadcastRefresh group' CloudUpdate gs' >>= uncurry rec
                 (Nothing, Upvote bid) ->
                     case upvoteBlock bid uid cloud of
@@ -226,9 +232,26 @@ runGroup serverStateVar
                     broadcastRefresh group' StoryUpdate gs >>= uncurry rec
   where
     rec group' gs' = runGroup serverStateVar group' gs' gchan
+
+    maxBlock :: [CloudItem] -> Maybe Block
     maxBlock [] = Nothing
     maxBlock xs = Just (cloudBlock (maximum xs))
 
+    insertSink :: User -> Sink WebSocketProtocol -> GroupState -> GroupState
+    insertSink User{ userId = uid } sink gs0@GroupState{ groupSinks = sinks } =
+        gs0{ groupSinks = Map.insert uid sink sinks }
+
+    incCount :: GroupState -> (GroupState, Int)
+    incCount gs0@GroupState{ groupCounter = i } =
+        (gs0{ groupCounter = i + 1 }, i)
+
+    spawnFlushCloud :: (MonadIO m, Functor m) => Int -> m ()
+    spawnFlushCloud secs = void . liftIO . forkIO $ do
+        threadDelay (secs * 1000000)
+        atomically $ writeTChan gchan Timeout
+
+-- | Close the given story.  The group will cease to function as expected beyond this
+-- point.
 closeStory :: TVar ServerState -> Group -> GroupState -> TChan GroupCmd -> Story -> IO ()
 closeStory ssvar group gs gchan story = do
     putStrLn "Closed story"
@@ -243,6 +266,8 @@ closeStory ssvar group gs gchan story = do
         _ <- atomically $ readTChan gchan
         broadcastRefresh group NoChanges gs
 
+-- | Broadcast a single command to all connected users.  Prune the ones for which sending
+-- failed.
 broadcastCmd :: ServerCmd -> Group -> GroupState -> IO (Group, GroupState)
 broadcastCmd cmd group gs@GroupState{groupSinks = sinks} = do
     _ <- printf "sending %s\n\n" (show cmd)
@@ -259,8 +284,13 @@ broadcastCmd cmd group gs@GroupState{groupSinks = sinks} = do
             WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
             return (grp0, gs0)
 
+-- | Broadcast a 'Refresh' command with 'broadcastCmd'.
 broadcastRefresh :: Group -> ServerCmdReason -> GroupState -> IO (Group, GroupState)
 broadcastRefresh g reason = broadcastCmd (Refresh g reason) g
+
+------------------------------------------
+-- Stories' persistence
+------------------------------------------
 
 -- | Save all finished stories to "storyDir/<sha1 of story text>" as Show'd values.
 saveStories :: (MonadIO m) => [Story] -> m ()
@@ -288,6 +318,10 @@ loadStories = liftIO $ do
         else
             return []
 
+------------------------------------------
+-- Main server function
+------------------------------------------
+
 -- | Start the WordWang server on the given host and port, return immediately,
 --   and return an action that shuts down the server.
 serve :: String -> Int -> IO (IO ())
@@ -297,7 +331,7 @@ serve host port = do
                                         , serverCounter = 0
                                         , closedStories = initialStories }
     tid <- forkIO $ CE.handle (\(_ :: Shutdown) -> return ())
-                              (WS.runServer host port (preJoin serverState))
+                              (WS.runServer host port (waitForUserJoin serverState))
     return $ do
         CE.throwTo tid Shutdown
         ServerState{closedStories = stories} <- atomically (readTVar serverState)
