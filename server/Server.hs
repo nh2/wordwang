@@ -29,6 +29,27 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.Map as Map
 import qualified Network.WebSockets as WS
 
+------------------------------------------
+-- Constants
+------------------------------------------
+
+-- | Time for a round in seconds.
+roundTime :: Int
+roundTime = 7
+
+-- | Where are stories saved on disk?
+storyDir :: FilePath
+storyDir = "stories"
+
+-- | There's a 1 in newGroupP chance of creating a new group when a user joins without
+-- specifying one.
+newGroupP :: Int
+newGroupP = 10
+
+------------------------------------------
+-- Types
+------------------------------------------
+
 data ServerState = ServerState
     { serverGroups    :: Map GroupId GroupChan
     , serverCounter   :: Int
@@ -103,7 +124,7 @@ makeId serverStateVar = liftIO $ atomically $ do
 getCreateGroup :: (MonadIO m) => TVar ServerState -> Maybe GroupId -> m GroupChan
 getCreateGroup serverStateVar Nothing = liftIO $ do
     ServerState {serverGroups = gs} <- atomically $ readTVar serverStateVar
-    nc <- randomRIO (0, _NEW_GROUP_P)
+    nc <- randomRIO (0, newGroupP)
     -- Create a new group if there are no existing ones, or if d10 comes out 0.
     if Map.null gs || nc == 0
         then do
@@ -122,19 +143,6 @@ getCreateGroup serverStateVar (Just gid) = liftIO $ do
     case mgchan of
         Just gchan -> return gchan
         Nothing    -> createGroup serverStateVar gid
-
--- | seconds
-_TICK_DELAY :: Int
-_TICK_DELAY = 7
-
--- | Where are stories saved on disk?
-_STORY_DIR :: FilePath
-_STORY_DIR = "stories"
-
--- | There's a 1 in _NEW_GROUP_P chance of creating a new group when a user joins without
--- specifying one.
-_NEW_GROUP_P :: Int
-_NEW_GROUP_P = 10
 
 createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m GroupChan
 createGroup serverStateVar gid = liftIO $ do
@@ -184,7 +192,7 @@ runGroup serverStateVar
                         block = Block bid blockContent
                         cloud' = insertBlock block uid cloud
                         group' = group {groupCloud = cloud'}
-                    when (cloudEmpty cloud) (spawnFlushCloud _TICK_DELAY gchan)
+                    when (cloudEmpty cloud) (spawnFlushCloud roundTime gchan)
                     broadcastRefresh group' CloudUpdate gs' >>= uncurry rec
                 (Nothing, Upvote bid) ->
                     case upvoteBlock bid uid cloud of
@@ -246,25 +254,25 @@ broadcastCmd cmd group gs@GroupState{groupSinks = sinks} = do
 broadcastRefresh :: Group -> ServerCmdReason -> GroupState -> IO (Group, GroupState)
 broadcastRefresh g reason = broadcastCmd (Refresh g reason) g
 
--- | Save all finished stories to "_STORY_DIR/<sha1 of story text>" as Show'd values.
+-- | Save all finished stories to "storyDir/<sha1 of story text>" as Show'd values.
 saveStories :: (MonadIO m) => [Story] -> m ()
 saveStories ss = liftIO $ do
     _ <- printf "Saving %d stories\n" (length ss)
-    dirExists <- doesDirectoryExist _STORY_DIR
-    unless dirExists $ createDirectory _STORY_DIR
+    dirExists <- doesDirectoryExist storyDir
+    unless dirExists $ createDirectory storyDir
     forM_ ss $ \story -> do
         let storyText = BL.pack (show story)
-        BL.writeFile (_STORY_DIR </> (showDigest (sha1 storyText))) storyText
+        BL.writeFile (storyDir </> (showDigest (sha1 storyText))) storyText
 
--- | Load stories from "_STORY_DIR/*".  If the directory does not exist, returns an empty
+-- | Load stories from "storyDir/*".  If the directory does not exist, returns an empty
 --   list.
 loadStories :: (MonadIO m) => m [Story]
 loadStories = liftIO $ do
     putStrLn "Loading stories"
-    dirExists <- doesDirectoryExist _STORY_DIR
+    dirExists <- doesDirectoryExist storyDir
     if dirExists
         then do
-            fs <- getDirectoryContents _STORY_DIR
+            fs <- getDirectoryContents storyDir
             fs' <- filterM doesFileExist fs
             forM fs' $ \f -> do
                 text <- BL.readFile f
