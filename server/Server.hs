@@ -50,24 +50,32 @@ newGroupP = 10
 -- Types
 ------------------------------------------
 
+-- | The global state shared among all threads in the server.
 data ServerState = ServerState
-    { serverGroups    :: Map GroupId GroupChan
-    , serverCounter   :: Int
+    { serverGroups  :: Map GroupId (TChan GroupCmd)
+    , serverCounter :: Int
     , closedStories :: [Story]
     }
 
-type GroupChan = TChan GroupCmd
-
+-- | The state of each group thread.
 data GroupState = GroupState
     { groupSinks   :: Map UserId (Sink WebSocketProtocol)
     , groupCounter :: Int       -- ^ used to generate ids unique to the group
     }
 
+-- | We use the latest and greatest iteration of the WebSockets protocol.
 type WebSocketProtocol = Hybi00
 
-data GroupCmd
-    = ClientCmdFwd UserId (Maybe (Sink WebSocketProtocol)) ClientCmd
-    | Timeout
+-- | The group threads may receive forwarded client commands, or timeouts, signaling the
+-- end of a voting round.
+data GroupCmd = ClientCmdFwd UserId (Maybe (Sink WebSocketProtocol)) ClientCmd
+              | Timeout
+
+-- | This signals the server thread to shutdown.
+data Shutdown = Shutdown
+    deriving (Data, Show, Typeable)
+
+instance Exception Shutdown
 
 insertSink :: User -> Sink WebSocketProtocol -> GroupState -> GroupState
 insertSink User{ userId = uid } sink gs@GroupState{ groupSinks = sinks } =
@@ -102,7 +110,7 @@ preJoin serverStateVar rq = do
         _ ->
             fail "Expecting join message"
 
-runUser :: GroupChan -> UserId -> WebSockets WebSocketProtocol ()
+runUser :: TChan GroupCmd -> UserId -> WebSockets WebSocketProtocol ()
 runUser gchan uid = forever $ do
     _ <- liftIO $ printf "Waiting for msg for user %d\n" uid
     mcmd <- receiveClientCmd
@@ -121,7 +129,7 @@ makeId serverStateVar = liftIO $ atomically $ do
     writeTVar serverStateVar (serverState {serverCounter = i + 1})
     return i
 
-getCreateGroup :: (MonadIO m) => TVar ServerState -> Maybe GroupId -> m GroupChan
+getCreateGroup :: (MonadIO m) => TVar ServerState -> Maybe GroupId -> m (TChan GroupCmd)
 getCreateGroup serverStateVar Nothing = liftIO $ do
     ServerState {serverGroups = gs} <- atomically $ readTVar serverStateVar
     nc <- randomRIO (0, newGroupP)
@@ -144,7 +152,7 @@ getCreateGroup serverStateVar (Just gid) = liftIO $ do
         Just gchan -> return gchan
         Nothing    -> createGroup serverStateVar gid
 
-createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m GroupChan
+createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m (TChan GroupCmd)
 createGroup serverStateVar gid = liftIO $ do
     let group = Group { groupId = gid
                       , groupUsers = Map.empty
@@ -165,11 +173,11 @@ createGroup serverStateVar gid = liftIO $ do
                      return ())
     return groupChan
 
-spawnFlushCloud :: (MonadIO m, Functor m) => Int -> GroupChan -> m ()
+spawnFlushCloud :: (MonadIO m, Functor m) => Int -> TChan GroupCmd -> m ()
 spawnFlushCloud secs gchan = void . liftIO . forkIO $ do
     threadDelay (secs * 1000000); atomically $ writeTChan gchan Timeout
 
-runGroup :: TVar ServerState -> Group -> GroupState -> GroupChan -> IO ()
+runGroup :: TVar ServerState -> Group -> GroupState -> TChan GroupCmd -> IO ()
 runGroup serverStateVar
          group@Group{ groupCloud = cloud@(Cloud votes _)
                     , groupStory = story }
@@ -221,7 +229,7 @@ runGroup serverStateVar
     maxBlock [] = Nothing
     maxBlock xs = Just (cloudBlock (maximum xs))
 
-closeStory :: TVar ServerState -> Group -> GroupState -> GroupChan -> Story -> IO ()
+closeStory :: TVar ServerState -> Group -> GroupState -> TChan GroupCmd -> Story -> IO ()
 closeStory ssvar group gs gchan story = do
     putStrLn "Closed story"
     atomically $ do
@@ -279,11 +287,6 @@ loadStories = liftIO $ do
                 return (read (BL.unpack text))
         else
             return []
-
-data Shutdown = Shutdown
-    deriving (Data, Show, Typeable)
-
-instance Exception Shutdown
 
 -- | Start the WordWang server on the given host and port, return immediately,
 --   and return an action that shuts down the server.
