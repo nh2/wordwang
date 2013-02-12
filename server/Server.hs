@@ -1,34 +1,33 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, ScopedTypeVariables #-}
+
 module Server where
 
-import           Control.Applicative ((<$>))
-import           Control.Concurrent (forkIO, threadDelay)
-import           Control.Exception (Exception)
+import Control.Applicative ( (<$>) )
+import Control.Concurrent ( forkIO, threadDelay )
+import Control.Concurrent.STM ( atomically
+                              , TVar, newTVarIO, readTVar, writeTVar
+                              , TChan, newTChanIO, readTChan, writeTChan )
+import Control.Exception ( Exception )
+import Control.Monad ( forever, forM, forM_, void, unless, filterM, when )
+import Control.Monad.Trans ( MonadIO(..) )
+import Data.Data ( Data, Typeable )
+import Data.Digest.Pure.SHA ( sha1, showDigest )
+import Data.Foldable ( foldlM )
+import Data.Map ( Map )
+import Network.WebSockets ( Request, WebSockets, Hybi00, Sink )
+import Objects ( ServerCmd(..), Group(..), Block(..), ClientCmd(..), Cloud(..)
+               , ServerCmdReason(..), BlockContent(..), Story, User(..), UserId
+               , GroupId, JoinPayload(..)
+               , newCloud, insertUser, insertBlock, cloudEmpty, upvoteBlock, cloudBlock )
+import System.Directory ( createDirectory, doesDirectoryExist, getDirectoryContents, doesFileExist )
+import System.FilePath ( (</>) )
+import System.Random ( randomRIO )
+import Text.Printf ( printf )
 import qualified Control.Exception as CE
-import           Control.Monad (forever, forM, forM_, void, unless, filterM, when)
-import           Data.Data (Data, Typeable)
-import           Data.Foldable (foldlM)
-import           System.FilePath ((</>))
-
-import           Control.Concurrent.STM
-import           Control.Monad.Trans (MonadIO(..))
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           System.Directory
-                 (createDirectory, doesDirectoryExist, getDirectoryContents,
-                  doesFileExist)
-import           Text.Printf (printf)
-
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BL
-import           Data.Digest.Pure.SHA (sha1, showDigest)
-import           Network.WebSockets (Request, WebSockets, Hybi00, Sink)
+import qualified Data.Map as Map
 import qualified Network.WebSockets as WS
-import           System.Random (randomRIO)
-
-import           Objects
 
 data ServerState = ServerState
     { serverGroups    :: Map GroupId GroupChan
