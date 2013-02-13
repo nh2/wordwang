@@ -21,6 +21,7 @@ import Objects ( ServerCmd(..), Group(..), Block(..), ClientCmd(..), Cloud(..)
                , newCloud, insertUser, insertBlock, cloudEmpty, upvoteBlock, cloudBlock )
 import System.Directory ( createDirectory, doesDirectoryExist, getDirectoryContents, doesFileExist )
 import System.FilePath ( (</>) )
+import System.Log.Logger ( debugM )
 import System.Random ( randomRIO )
 import Text.Printf ( printf )
 import qualified Control.Exception as CE
@@ -32,6 +33,10 @@ import qualified Network.WebSockets as WS
 ------------------------------------------
 -- Constants
 ------------------------------------------
+
+-- | Logger name.
+tag :: String
+tag = "Server"
 
 -- | Time for a round in seconds.
 roundTime :: Int
@@ -84,6 +89,7 @@ instance Exception Shutdown
 -- to it.
 waitForUserJoin :: TVar ServerState -> Request -> WebSockets WebSocketProtocol ()
 waitForUserJoin serverStateVar rq = do
+    liftIO $ debugM tag "waitForUserJoin"
     WS.acceptRequest rq
     mcmd <- receiveClientCmd
     case mcmd of
@@ -100,7 +106,7 @@ waitForUserJoin serverStateVar rq = do
 -- | Forward user commands to the connected group.
 forwardUserCmds :: TChan GroupCmd -> UserId -> WebSockets WebSocketProtocol ()
 forwardUserCmds gchan uid = forever $ do
-    _ <- liftIO $ printf "Waiting for msg for user %d\n" uid
+    liftIO $ debugM tag (printf "forwardUserCmds: uid = %d\n" uid)
     mcmd <- receiveClientCmd
     case mcmd of
         Just (Join _) ->
@@ -114,6 +120,7 @@ forwardUserCmds gchan uid = forever $ do
 -- | Receive a single 'ClientCmd'.  May fail due to parse errors.
 receiveClientCmd :: WebSockets WebSocketProtocol (Maybe ClientCmd)
 receiveClientCmd = do
+    liftIO $ debugM tag "receiveClientCmd"
     msg <- WS.receive
     case msg of
         WS.ControlMessage _ ->
@@ -127,6 +134,7 @@ receiveClientCmd = do
 -- | Get the existing group for the given ID, or create a new one with it.
 getCreateGroup :: (MonadIO m) => TVar ServerState -> Maybe GroupId -> m (TChan GroupCmd)
 getCreateGroup serverStateVar Nothing = liftIO $ do
+    liftIO $ debugM tag "getCreateGroup: no gid"
     ServerState {serverGroups = gs} <- atomically $ readTVar serverStateVar
     nc <- randomRIO (0, newGroupP)
     -- Create a new group if there are no existing ones, or if d10 comes out 0.
@@ -141,6 +149,7 @@ getCreateGroup serverStateVar Nothing = liftIO $ do
             i <- randomRIO (0, Map.size gs - 1)
             return (gchans !! i)
 getCreateGroup serverStateVar (Just gid) = liftIO $ do
+    liftIO $ debugM tag (printf "getCreateGroup: gid = %d\n" gid)
     mgchan <- atomically $ do
               ServerState {serverGroups = gs} <- readTVar serverStateVar
               return (Map.lookup gid gs)
@@ -151,6 +160,7 @@ getCreateGroup serverStateVar (Just gid) = liftIO $ do
 -- | Create a group with the given 'GroupId'.  This ID /must/ be fresh.
 createGroup :: (MonadIO m) => TVar ServerState -> GroupId -> m (TChan GroupCmd)
 createGroup serverStateVar gid = liftIO $ do
+    liftIO $ debugM tag (printf "createGroup: gid = %d\n" gid)
     let group = Group { groupId = gid
                       , groupUsers = Map.empty
                       , groupStory = []
@@ -185,10 +195,12 @@ makeId serverStateVar = liftIO $ atomically $ do
 -- | Run a group thread.
 runGroup :: TVar ServerState -> Group -> GroupState -> TChan GroupCmd -> IO ()
 runGroup serverStateVar
-         group@Group{ groupCloud = cloud@(Cloud votes _)
+         group@Group{ groupId    = gid
+                    , groupCloud = cloud@(Cloud votes _)
                     , groupStory = story }
          gs
          gchan = do
+    debugM tag (printf "runGroup: gid = %d\n" gid)
     gcmd <- atomically $ readTChan gchan
     case gcmd of
         ClientCmdFwd uid mSink cmd ->
@@ -254,6 +266,7 @@ runGroup serverStateVar
 -- point.
 closeStory :: TVar ServerState -> Group -> GroupState -> TChan GroupCmd -> Story -> IO ()
 closeStory ssvar group gs gchan story = do
+    debugM tag (printf "closeStory: gid = %d\n" (groupId group))
     putStrLn "Closed story"
     atomically $ do
         sstate@ServerState{ closedStories = fss
@@ -270,7 +283,7 @@ closeStory ssvar group gs gchan story = do
 -- failed.
 broadcastCmd :: ServerCmd -> Group -> GroupState -> IO (Group, GroupState)
 broadcastCmd cmd group gs@GroupState{groupSinks = sinks} = do
-    _ <- printf "sending %s\n\n" (show cmd)
+    debugM tag (printf "broadcastCmd: gid = %d, cmd = %s" (groupId group) (take 20 (show cmd)))
     foldlM sendSink' (group, gs) (Map.toList sinks)
   where
     sendSink' ( grp0@Group{groupUsers = users}
@@ -295,7 +308,7 @@ broadcastRefresh g reason = broadcastCmd (Refresh g reason) g
 -- | Save all finished stories to "storyDir/<sha1 of story text>" as Show'd values.
 saveStories :: (MonadIO m) => [Story] -> m ()
 saveStories ss = liftIO $ do
-    _ <- printf "Saving %d stories\n" (length ss)
+    debugM tag (printf "saveStories: # = %d" (length ss))
     dirExists <- doesDirectoryExist storyDir
     unless dirExists $ createDirectory storyDir
     forM_ ss $ \story -> do
@@ -306,7 +319,7 @@ saveStories ss = liftIO $ do
 --   list.
 loadStories :: (MonadIO m) => m [Story]
 loadStories = liftIO $ do
-    putStrLn "Loading stories"
+    debugM tag "loadStories"
     dirExists <- doesDirectoryExist storyDir
     if dirExists
         then do
@@ -326,6 +339,7 @@ loadStories = liftIO $ do
 --   and return an action that shuts down the server.
 serve :: String -> Int -> IO (IO ())
 serve host port = do
+    debugM tag "serve"
     initialStories <- loadStories
     serverState <- newTVarIO ServerState{ serverGroups  = Map.empty
                                         , serverCounter = 0

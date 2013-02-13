@@ -16,12 +16,15 @@ import qualified Control.Exception as CE
 -- Constants
 ------------------------------------------
 
+-- | Logger name.
 tag :: String
 tag = "wordwang"
 
+-- | Hostname for server.
 host :: String
 host = "0.0.0.0"
 
+-- | Port number for server.
 port :: Int
 port = 8888
 
