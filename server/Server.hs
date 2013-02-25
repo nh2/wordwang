@@ -283,7 +283,8 @@ closeStory ssvar group gs gchan story = do
 -- failed.
 broadcastCmd :: ServerCmd -> Group -> GroupState -> IO (Group, GroupState)
 broadcastCmd cmd group gs@GroupState{groupSinks = sinks} = do
-    debugM tag (printf "broadcastCmd: gid = %d, cmd = %s" (groupId group) (take 20 (show cmd)))
+    debugM tag (printf "broadcastCmd: gid = %d" (groupId group))
+    debugM tag (printf "cmd = %s" (show cmd))
     foldlM sendSink' (group, gs) (Map.toList sinks)
   where
     sendSink' ( grp0@Group{groupUsers = users}

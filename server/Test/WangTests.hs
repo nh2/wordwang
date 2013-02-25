@@ -2,14 +2,15 @@
 
 module Main where
 
+import Control.Concurrent ( threadDelay )
+import Data.ByteString ( ByteString )
 import Data.Monoid ( mempty )
+import Network.WebSockets ( WebSockets, Hybi00 )
+import Server ( serve )
 import Test.Framework
 import Test.Framework.Providers.HUnit
 import Test.HUnit
 import qualified Network.WebSockets as WS
-import Network.WebSockets ( WebSockets, Hybi00 )
-import Data.ByteString ( ByteString )
-import Server ( serve )
 
 main :: IO ()
 main = defaultMainWithOpts [testCase "expectedBehaviour" testExpectedBehaviour] options
@@ -18,8 +19,9 @@ main = defaultMainWithOpts [testCase "expectedBehaviour" testExpectedBehaviour] 
 
 testExpectedBehaviour :: Assertion
 testExpectedBehaviour = do
-    serve "localhost" 8765
-    WS.connect "ws://localhost" 8765 "" testWS
+    serve "127.0.0.1" 8765
+    threadDelay 2000000
+    WS.connect "127.0.0.1" 8765 "/" testWS
   where
     testWS :: WebSockets Hybi00 ()
     testWS = do
