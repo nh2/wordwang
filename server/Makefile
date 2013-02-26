@@ -29,8 +29,9 @@ test: build
 	$(CABAL) test
 
 p:
-	permamake.sh *.hs \
-	             Test/*.hs \
+	permamake.sh $(shell find src/ -name '*.hs') \
+	             $(shell find src/ -name '*.hs') \
+	             wordwang.hs \
 	             *.cabal \
 	             Makefile
 
