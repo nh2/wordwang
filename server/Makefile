@@ -1,30 +1,32 @@
+CABAL := $(shell cabal-dev --version > /dev/null && echo cabal-dev || echo cabal)
+
 all: build test
 
 .PHONY: all build dist install clean doc p test ghci
 
 build: dist/setup-config
-	cabal-dev build
+	$(CABAL) build
 
 dist:
-	cabal-dev sdist
+	$(CABAL) sdist
 
 install: build
-	cabal install
+	cabal install --force-reinstalls
 
 clean:
-	cabal-dev clean
+	$(CABAL) clean
 	rm -rf cabal-dev/ log/
 
 dist/setup-config: wordwang.cabal
 # If you don't have all the necessary packages installed on the first
 # run, run `cabal-dev install`.
-	cabal-dev configure --enable-tests || cabal-dev install --enable-tests
+	$(CABAL) configure --enable-tests || $(CABAL) install --enable-tests
 
 doc: build
-	cabal-dev haddock
+	$(CABAL) haddock
 
 test: build
-	cabal-dev test
+	$(CABAL) test
 
 p:
 	permamake.sh *.hs \
