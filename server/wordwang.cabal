@@ -25,7 +25,7 @@ Executable wordwang
                         bytestring,
                         directory,
                         filepath,
-                        websockets,
+                        websockets >= 0.8,
                         text,
                         mtl,
                         containers,

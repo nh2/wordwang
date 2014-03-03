@@ -24,7 +24,7 @@ import           Text.Printf (printf)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Digest.Pure.SHA (sha1, showDigest)
-import           Network.WebSockets (Request, WebSockets, Hybi00, Sink)
+import           Network.WebSockets (PendingConnection, Connection)
 import qualified Network.WebSockets as WS
 import           System.Random (randomRIO)
 
@@ -38,17 +38,15 @@ data ServerState = ServerState
 
 type GroupChan = TChan GroupCmd
 data GroupState = GroupState
-    { groupSinks   :: Map UserId (Sink WebSocketProtocol)
+    { groupSinks   :: Map UserId (Connection)
     , groupCounter :: Int       -- ^ used to generate ids unique to the group
     }
 
-type WebSocketProtocol = Hybi00
-
 data GroupCmd
-    = ClientCmdFwd UserId (Maybe (Sink WebSocketProtocol)) ClientCmd
+    = ClientCmdFwd UserId (Maybe (Connection)) ClientCmd
     | Timeout
 
-insertSink :: User -> Sink WebSocketProtocol -> GroupState -> GroupState
+insertSink :: User -> Connection -> GroupState -> GroupState
 insertSink User{userId = uid} sink gs@GroupState{groupSinks = sinks} =
     gs{groupSinks = Map.insert uid sink sinks}
 
@@ -75,9 +73,9 @@ incCount gs@GroupState{groupCounter = i} = (gs{groupCounter = i + 1}, i)
 --                                 , (4, CloudItem block4 (Set.fromList [8, 12]))
 --                                 ])
 
-receiveClientCmd :: WebSockets WebSocketProtocol (Maybe ClientCmd)
-receiveClientCmd =
-    do msg <- WS.receive
+receiveClientCmd :: Connection -> IO (Maybe ClientCmd)
+receiveClientCmd conn =
+    do msg <- WS.receive conn
        case msg of
            WS.ControlMessage _ ->
                return Nothing
@@ -86,25 +84,24 @@ receiveClientCmd =
            WS.DataMessage (WS.Binary b) ->
                Just <$> maybe (fail "Failed to parse ClientCmd") return (Aeson.decode' b)
 
-preJoin :: TVar ServerState -> Request -> WebSockets WebSocketProtocol ()
+preJoin :: TVar ServerState -> PendingConnection -> IO ()
 preJoin serverStateVar rq =
-    do WS.acceptRequest rq
-       mcmd <- receiveClientCmd
+    do conn <- WS.acceptRequest rq
+       mcmd <- receiveClientCmd conn
        case mcmd of
            Just cmd@(Join (JoinPayload _ mGroupId)) -> do
                liftIO $ print cmd
                uid <- makeId serverStateVar
                gchan <- getCreateGroup serverStateVar mGroupId
-               sink <- WS.getSink
                liftIO $ atomically $
-                        writeTChan gchan (ClientCmdFwd uid (Just sink) cmd)
-               runUser gchan uid
+                        writeTChan gchan (ClientCmdFwd uid (Just conn) cmd)
+               runUser conn gchan uid
            _ -> fail "Expecting join message"
 
-runUser :: GroupChan -> UserId -> WebSockets WebSocketProtocol ()
-runUser gchan uid = forever $ do
+runUser :: Connection -> GroupChan -> UserId -> IO ()
+runUser conn gchan uid = forever $ do
     _ <- liftIO $ printf "Waiting for msg for user %d\n" uid
-    mcmd <- receiveClientCmd
+    mcmd <- receiveClientCmd conn
     case mcmd of
         Just (Join _) ->
             fail "Expecting non-join cmd"
@@ -190,8 +187,8 @@ runGroup serverStateVar
                        do let user   = User uid uname
                               group' = insertUser user group
                               gs'    = insertSink user sink gs
-                          WS.sendSink sink (WS.DataMessage
-                                            (WS.Text (Aeson.encode (Refresh group' LoggedIn))))
+                          WS.send sink (WS.DataMessage
+                                        (WS.Text (Aeson.encode (Refresh group' LoggedIn))))
                               `CE.catch` (\(_ :: CE.SomeException) -> return ())
                           broadcastRefresh group' NewJoin gs' >>= uncurry rec
                    (Nothing, Send blockContent) ->
@@ -250,7 +247,7 @@ broadcastCmd cmd group gs@GroupState{groupSinks = sinks} =
                           return ( grp0{groupUsers = Map.delete uid users}
                                  , gs0{groupSinks = Map.delete uid sinks'} )) $
                do putStrLn "Sending message to some sink"
-                  WS.sendSink sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
+                  WS.send sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
                   return (grp0, gs0)
 
 broadcastRefresh :: Group -> ServerCmdReason -> GroupState -> IO (Group, GroupState)
