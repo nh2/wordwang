@@ -47,8 +47,8 @@ data GroupCmd
     | Timeout
 
 insertSink :: User -> Connection -> GroupState -> GroupState
-insertSink User{userId = uid} sink gs@GroupState{groupSinks = sinks} =
-    gs{groupSinks = Map.insert uid sink sinks}
+insertSink User{userId = uid} conn gs@GroupState{groupSinks = conns} =
+    gs{groupSinks = Map.insert uid conn conns}
 
 incCount :: GroupState -> (GroupState, Int)
 incCount gs@GroupState{groupCounter = i} = (gs{groupCounter = i + 1}, i)
@@ -183,11 +183,11 @@ runGroup serverStateVar
        case gcmd of
            ClientCmdFwd uid mSink cmd ->
                case (mSink, cmd) of
-                   (Just sink, Join (JoinPayload uname _)) ->
+                   (Just conn, Join (JoinPayload uname _)) ->
                        do let user   = User uid uname
                               group' = insertUser user group
-                              gs'    = insertSink user sink gs
-                          WS.send sink (WS.DataMessage
+                              gs'    = insertSink user conn gs
+                          WS.send conn (WS.DataMessage
                                         (WS.Text (Aeson.encode (Refresh group' LoggedIn))))
                               `CE.catch` (\(_ :: CE.SomeException) -> return ())
                           broadcastRefresh group' NewJoin gs' >>= uncurry rec
@@ -235,19 +235,19 @@ closeStory ssvar group gs gchan story =
                     broadcastRefresh group NoChanges gs
 
 broadcastCmd :: ServerCmd -> Group -> GroupState -> IO (Group, GroupState)
-broadcastCmd cmd group gs@GroupState{groupSinks = sinks} =
+broadcastCmd cmd group gs@GroupState{groupSinks = conns} =
     do _ <- printf "sending %s\n\n" (show cmd)
-       foldlM sendSink' (group, gs) (Map.toList sinks)
+       foldlM sendSink' (group, gs) (Map.toList conns)
   where
     sendSink' ( grp0@Group{groupUsers = users}
-              , gs0@GroupState{groupSinks = sinks'})
-              (uid, sink) =
+              , gs0@GroupState{groupSinks = conns'})
+              (uid, conn) =
         do CE.handle (\(_ :: CE.SomeException) ->
-                       do _ <- putStrLn "There's a dead sink.  Removing it."
+                       do _ <- putStrLn "There's a dead connection.  Removing it."
                           return ( grp0{groupUsers = Map.delete uid users}
-                                 , gs0{groupSinks = Map.delete uid sinks'} )) $
-               do putStrLn "Sending message to some sink"
-                  WS.send sink (WS.DataMessage (WS.Text (Aeson.encode cmd)))
+                                 , gs0{groupSinks = Map.delete uid conns'} )) $
+               do putStrLn "Sending message to some connection"
+                  WS.send conn (WS.DataMessage (WS.Text (Aeson.encode cmd)))
                   return (grp0, gs0)
 
 broadcastRefresh :: Group -> ServerCmdReason -> GroupState -> IO (Group, GroupState)
